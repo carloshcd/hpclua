@@ -1,0 +1,2 @@
+:: place ::
+goto place
