@@ -34,70 +34,74 @@ import java.util.ArrayList;
 
 public class TableType extends LuaType {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 11L;
 
     Map<LuaType,LuaType> elements;   
 
     public TableType() {
        super(LuaType.tTABLE);
        this.elements = new HashMap<LuaType,LuaType>();
-       this.setName(this.toString());
     }
  
     public TableType(LuaType k, LuaType v) {
        super(LuaType.tTABLE);
        this.elements = new HashMap<LuaType,LuaType>();
        this.elements.put(k,v);
-       this.setName(this.toString());
     }
  
     public TableType(Map<LuaType,LuaType> s) {
-        super(LuaType.tTABLE);
-        this.elements = s;
-        this.setName(this.toString());
+       super(LuaType.tTABLE);
+       this.elements = s;
     }
     
     public Map<LuaType,LuaType> getElements() {
-        return elements;
+       return elements;
+    }
+
+    public void setElements(Map<LuaType,LuaType> t) { 
+       this.elements = t;
     }
 
     public int size() {
-       return elements.size();
+       return this.getElements().size();
     }
 
     @Override 
     public String toString() { 
-        if (elements == null) 
-           return "{.}";
-        else {
-           String result = ".";
-           Map<LuaType,LuaType> m = this.elements;
-           for (Map.Entry<LuaType,LuaType> me : m.entrySet()) {
-               if (!result.equals(".")) 
-                  result = result + ",";
-               else
+        String result = "{.}";
+        if (this.getElements() != null) {
+           Set<Map.Entry<LuaType,LuaType>> mes = this.getElements().entrySet();
+           for (Map.Entry<LuaType,LuaType> me : mes) {
+               if ("{.}".equals(result)) 
                   result = "";
-               result = result + me.getKey().toString() + "|->" + me.getValue().toString(); 
+               else
+                  result = result + ",";
+               result = result + me.getKey().fold() + "|->" + 
+                                 me.getValue().fold(); 
            }
-           return "{"+result+"}";
+           if (!("{.}".equals(result)))
+              result = "{"+result+"}";
         }
+        if ("{.}".equals(result))
+           return "Table";
+        else 
+           return result;
     }
    
     @Override 
     public TableType expand(Scope s) { 
-        if (elements == null) 
+        if (this.getElements() == null) 
            new Throwable().printStackTrace();
         else {
-           Map<LuaType,LuaType> m = this.elements;
-           List<LuaType> remove = new ArrayList<LuaType>();
-           for (Map.Entry<LuaType,LuaType> me : m.entrySet()) {
-               LuaType newval = me.getKey().expand(s);
-               if (!me.getKey().equals(newval))
-                  remove.add(me.getKey());
-               m.put(newval, me.getValue().expand(s));
+           Map<LuaType,LuaType> result = new HashMap<LuaType,LuaType>();
+           Map<LuaType,LuaType> m = this.getElements();
+           Set<Map.Entry<LuaType,LuaType>> mes = m.entrySet();
+           for (Map.Entry<LuaType,LuaType> me : mes) {
+               LuaType ok = me.getKey();
+               LuaType nk = ok.expand(s);
+               result.put(nk, me.getValue().expand(s));
            }
-           for (LuaType k : remove)
-              m.remove(k);
+           this.setElements(result);
         }
         return this;
     }
@@ -114,68 +118,87 @@ public class TableType extends LuaType {
         if (this.size() != other.size())
            return false;
         else
-           return (this.elements.equals(other.getElements()));
+           return (this.getElements().equals(other.getElements()));
     }
-    
+
     @Override
     public boolean subtype(LuaType t) {
        if (t.equals(LuaType._Any)) // TTop
           return true;
        if (t instanceof TableType) { // TTab
-          Map<LuaType,LuaType> m = this.elements;
+          Map<LuaType,LuaType> m = this.getElements();
           Map<LuaType,LuaType> mt = ((TableType) t).getElements();
           for (Map.Entry<LuaType,LuaType> mte : mt.entrySet())
              for (Map.Entry<LuaType,LuaType> me : m.entrySet())
-                if (me.getKey().equals(mte.getKey()))
-                   if (!(me.getValue().subtype(mte.getValue())))
+                if ((me.getKey().equals(mte.getKey())) &&
+                    (!(me.getValue().subtype(mte.getValue()))))
                       return false;
           return true;
-      } else if (t instanceof UnionType) // TUSup
-         return ((UnionType) t).TUSup(this);
+      } else 
+         if (t instanceof SequenceType) // TSeq
+            return ((SequenceType) t).TSeq(this);
+         else 
+            if (t instanceof UnionType) // TUSup
+               return ((UnionType) t).TUSup(this);
       return false;
    }
    
     @Override
     public LuaType subst(LuaType v, LuaType t) { 
-       Map<LuaType,LuaType> m = this.elements;
-       List<LuaType> remove = new ArrayList<LuaType>();
-       for (Map.Entry<LuaType,LuaType> me : m.entrySet()) {
-          LuaType obj = me.getKey();
-          if (obj.equals(v)) {
-             remove.add(obj);
-             m.put(LuaType.copy(t),me.getValue());
-          } else
-             obj.subst(v,t);
-          obj = me.getValue();
-          if (obj.equals(v)) 
-             me.setValue(LuaType.copy(t));
+       Map<LuaType,LuaType> result = new HashMap<LuaType,LuaType>();
+       Set<Map.Entry<LuaType,LuaType>> mes = this.getElements().entrySet();
+       for (Map.Entry<LuaType,LuaType> me : mes) {
+          LuaType ok = me.getKey();
+          LuaType ov = me.getValue();
+          LuaType nk;
+          if (ok.equals(t))
+             nk = LuaType.copy(t);
           else
-             obj.subst(v,t);
+             nk = ok.subst(v,t);
+          LuaType nv;
+          if (ov.equals(t))
+             nv = LuaType.copy(t);
+          else 
+             nv = ov.subst(v,t);
+          result.put(nk,nv);
        }
-       for (LuaType k : remove)
-          m.remove(k);
+       this.setElements(result);
        return this;
     }
    
     @Override
     public LuaType subst(Scope s) {
-       Map<LuaType,LuaType> tab = new HashMap<LuaType,LuaType>();
-       Map<LuaType,LuaType> m = this.elements;
-       for (Map.Entry<LuaType,LuaType> me : m.entrySet()) 
-          tab.put(me.getKey().subst(s), me.getValue().subst(s));
-       return new TableType(tab);
+       Map<LuaType,LuaType> result = new HashMap<LuaType,LuaType>();
+       Set<Map.Entry<LuaType,LuaType>> mes = this.getElements().entrySet();
+       for (Map.Entry<LuaType,LuaType> me : mes) {
+          LuaType ok = me.getKey();
+          LuaType ov = me.getValue();
+          LuaType nk = ok.subst(s);
+          LuaType nv = ov.subst(s);
+          if (!ok.equals(nk))
+             result.put(nk,nv);
+          else 
+             if (!ov.equals(nv))
+                result.put(ok,nv);
+             else
+                result.put(ok,ov);
+       }
+       this.setElements(result);
+       return this;
     }
     
     @Override 
     public List<VarType> freeTVars() {
        List<VarType> freeTVars = new ArrayList<VarType>();
-       Map<LuaType,LuaType> m = this.elements;
-       for (Map.Entry<LuaType,LuaType> me : m.entrySet()) {
-          for(VarType v : me.getKey().freeTVars()) {
+       Set<Map.Entry<LuaType,LuaType>> mes = this.getElements().entrySet();
+       for (Map.Entry<LuaType,LuaType> me : mes) {
+          List<VarType> oftv = me.getKey().freeTVars();
+          for(VarType v : oftv) {
              if (!freeTVars.contains(v))
                 freeTVars.add(v);
           }
-          for(VarType v : me.getValue().freeTVars()) {
+          oftv = me.getValue().freeTVars();
+          for(VarType v : oftv) {
              if (!freeTVars.contains(v))
                 freeTVars.add(v);
           }
@@ -184,33 +207,45 @@ public class TableType extends LuaType {
     }
     
     @Override
-    public Scope unifiesWith (Scope s, LuaType t) { 
-       if (t.equals(LuaType._Any) || 
-           t instanceof VarType ||
-           t instanceof UnionType)
-          return t.unifiesWith(s, this);
-       else // Tab 
+    public Scope unifiesWith (Scope s, LuaType t, int verb) { 
+       if ( verb > 1 ) 
+          System.out.printf("Unifying TableType: %s/%s\n", this, t);
+       if (t.equals(LuaType._Any))
+          return s;
+       else if (t instanceof VarType ||
+                t instanceof UnionType)
+          return t.unifiesWith(s,this,verb);
+       else 
           if (t instanceof TableType) {
-             Map<LuaType,LuaType> m = this.elements;
+             Map<LuaType,LuaType> m = this.getElements();
              Map<LuaType,LuaType> mt = ((TableType) t).getElements();
-             if (m.keySet().size() == 0 || mt.keySet().size() == 0)
+             if (m.keySet().size() == 0 || mt.keySet().size() == 0) 
                 return s;
              else { 
-                if (m.keySet().size() != mt.keySet().size())
+                if (m.keySet().size() != mt.keySet().size()) 
                    return null;
-                else {
+                else { // Tab
                    Scope s1 = null;
-                   for (Map.Entry<LuaType,LuaType> mte : mt.entrySet())
-                      for (Map.Entry<LuaType,LuaType> me : m.entrySet())
-                         if (me.getKey().equals(mte.getKey())) {
-                            Scope s2 = me.getValue().unifiesWith(s, mte.getValue());
-                            if (s2 != null) {
+                   Set<Map.Entry<LuaType,LuaType>> mtes = mt.entrySet();
+                   for (Map.Entry<LuaType,LuaType> mte : mtes) {
+                      Set<Map.Entry<LuaType,LuaType>> mes = m.entrySet();
+                      for (Map.Entry<LuaType,LuaType> me : mes) {
+                         Scope s2 = me.getKey().unifiesWith(s,mte.getKey(), 
+                                                            verb);
+                         if (s2 != null) {
+                            Scope s3 = me.getValue().unifiesWith(s2, 
+                                             mte.getValue(),verb);
+                            if (s3 != null) {
                                if (s1 == null)
                                   s1 = s;
-                               s1.mergeWith(s2);
+                               s1.mergeWith(s3);
                             } else
                                return null;
                          }
+                      }
+                   }
+                   if (s1 != null && verb > 1) 
+                      System.out.printf("Applying: Tab\n");
                    return s1;     
                 }
              }
@@ -219,9 +254,9 @@ public class TableType extends LuaType {
     }
     
     public TableType mergeWith(TableType t) {
-       Map<LuaType,LuaType> map = new HashMap<LuaType,LuaType>(this.elements);
-       Map<LuaType,LuaType> mt = t.getElements();
-       for (Map.Entry<LuaType,LuaType> mte : mt.entrySet()) {
+       Map<LuaType,LuaType> map = new HashMap<LuaType,LuaType>(t.getElements());
+       Set<Map.Entry<LuaType,LuaType>> mtes = this.getElements().entrySet();
+       for (Map.Entry<LuaType,LuaType> mte : mtes) {
           LuaType k = mte.getKey();
           LuaType vn = mte.getValue();
           if (map.containsKey(k)) {
@@ -232,26 +267,52 @@ public class TableType extends LuaType {
                 l.addAll(o);
              } else 
                 l.add(vo);
-             l.add(vn);
-             UnionType v = new UnionType(new SequenceType(l));
+             if (!(l.contains(vn)))
+                l.add(vn);
+             LuaType v;
+             if (l.size() > 1)
+                v = new UnionType(new SequenceType(l));
+             else
+                v = l.get(0);
              map.put(k,v);
           } else 
              map.put(k, vn);
        }
        return new TableType(map);
     }
-    
-    public LuaType select(Scope s, LuaType t) {
+   
+    @Override 
+    public LuaType select(Scope s, LuaType t, int verb) {
        List<LuaType> result = new ArrayList<LuaType>();
-       Map<LuaType,LuaType> mt = this.elements;
-       for (Map.Entry<LuaType,LuaType> mte : mt.entrySet()) {
+       Set<Map.Entry<LuaType,LuaType>> mtes = this.getElements().entrySet();
+       for (Map.Entry<LuaType,LuaType> mte : mtes) {
           LuaType k = mte.getKey();
-          if (k.unifiesWith(s, t) != null)
+          if (k.unifiesWith(s,t,verb) != null ||
+              k.equals(t))
              result.add(mte.getValue());
        }
        if (result.size() == 1) 
           return result.get(0);
        else 
           return new UnionType(new SequenceType (result));
+    }
+
+    @Override
+    public String fold() {
+       if (this.equals(LuaType._Table))
+          return "Table";
+       else
+          return this.toString();
+    }
+    
+    @Override
+    public boolean hasJustNumericKeys() {
+       Set<Map.Entry<LuaType,LuaType>> mtes = this.getElements().entrySet();
+       for (Map.Entry<LuaType,LuaType> mte : mtes) {
+          LuaType k = mte.getKey();
+          if (!k.isTTag() || !k.isNumericType())
+             return false;
+       }
+       return true;
     }
 }

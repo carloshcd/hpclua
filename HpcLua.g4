@@ -5,7 +5,8 @@
   Copyright (c) 2013, Kazunori Sakamoto
   Portions Rules Copyright (c) 2016, Alexander Alexeev
   Portions Rules Copyright (c) 2018, Carlos Henrique C. Duarte
-  Changes, Actions and Return Values, Copyright (c) 2018, Carlos Henrique C. Duarte
+  Changes, Actions and Return Values
+     Copyright (c) 2018, Carlos Henrique C. Duarte
   All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
@@ -41,7 +42,7 @@
   (http://www.lua.org/tests/5.2/)
   Tested by Alexander Alexeev with Test suite for Lua 5.3 
   (http://www.lua.org/tests/lua-5.3.2-tests.tar.gz)
-  Extender, fixed and tested by Carlos Henrique C. Duarte 
+  Extended, fixed and tested by Carlos Henrique C. Duarte 
   with Test suite for Lua 5.3 
   (http://www.lua.org/tests/lua-5.3.4-tests.tar.gz)
 ***/
@@ -76,7 +77,7 @@ numericType returns [LuaType type]
     ;
 
 varType returns [LuaType type]
-    :  NAME        
+    : NAME        
     { $type = new VarType($NAME.text); }
     ;
     
@@ -88,7 +89,8 @@ tableType returns [LuaType type]
     ;
 
 tableTypeSequence returns [TableType type]
-    : (o1=objectType | (o2=objectType '|->' o3=objectType)) (',' tableTypeSequence)?   
+    : (o1=objectType | (o2=objectType '|->' o3=objectType)) 
+         (',' tableTypeSequence)?   
       { TableType t = null;
         if ($o1.text == null)
            t = new TableType ($o2.type,$o3.type);
@@ -100,7 +102,7 @@ tableTypeSequence returns [TableType type]
       }
     ;
 
-// restructure grammar to avoid need ot parentheses
+// restructure grammar to avoid the need of parentheses
 functType returns [LuaType type] 
     :  '(' o1=anyObjectType '->' o2=anyObjectType ')'    
 	{   LuaType ao = $o1.type;
@@ -136,10 +138,10 @@ sequenceTypeSequence returns [SequenceType type]
 
 sequenceType returns [SequenceType type]
     : '(.)'
-	{ List<LuaType> t = new ArrayList<LuaType>();
+    { List<LuaType> t = new ArrayList<LuaType>();
       $type = new SequenceType (t); }
     | '(' sequenceTypeSequence ')'    
-	{ $type = $sequenceTypeSequence.type; }
+    { $type = $sequenceTypeSequence.type; }
     ;
 
 abbrvType returns [LuaType type] 
@@ -193,12 +195,12 @@ anyObjectType returns [LuaType type]
     { $type = $sequenceType.type; }
     ;
     
-typeCast returns [LuaType type]
+typeAscr returns [LuaType type]
     : ':.' objectType
     { $type = $objectType.type; }
     ;
     
-anyTypeCast returns [LuaType type]
+anyTypeAscr returns [LuaType type]
     : ':.' anyObjectType 
     { $type = $anyObjectType.type; }
     ;
@@ -214,40 +216,38 @@ block
     | stat block
     ;
 
-retStat
-    : 'return' expList? ';'?
-    ;
-    
 stat
     : ';'                                                                        # SemiColonStat
-    | varList '=' expList                                                        # GlobalVarAssignStat 
-    | functCall                                                                  # FunctCallStat
+    | varList '=' expList                                                        # GAsgnStat 
+    | functionCall                                                               # FunctionCallStat
     | label                                                                      # LabelStat
     | 'break'                                                                    # BreakStat
     | 'goto' NAME                                                                # GotoStat
     | 'do' block 'end'                                                           # DoStat
     | 'while' exp 'do' block 'end'                                               # WhileStat
     | 'repeat' block 'until' exp                                                 # RepeatStat
-    | 'if' exp 'then' block ('elseif' exp 'then' block)* ('else' block)? 'end'   # IfThenElseStat
-    | 'for' varNameAndType '=' exp ',' exp (',' exp)? 'do' block 'end'           # ForLocalNameStat
-    | 'for' nameList 'in' expList 'do' block 'end'                               # ForLocalExpStat
+    | 'if' exp 'then' block ('elseif' exp 'then' block)* ('else' block)? 'end'   # IfStat
+    | 'for' varNameAndType '=' exp ',' exp (',' exp)? 'do' block 'end'           # ForNumStat
+    | 'for' nameList 'in' expList 'do' block 'end'                               # ForGenStat
     | 'function' functName functBody                                             # FunctStat
     | 'local' 'function' varName functBody                                       # LocalFunctStat
-    | 'local' nameList ('=' expList)?                                            # LocalVarAssignStat
+    | 'local' nameList ('=' expList)?                                            # LAsgnStat
     ;
    
+retStat
+    : 'return' expList? ';'?
+    ;
+    
 label
     : '::' NAME '::'
     ;
     
-functName
-    : varName ('.' varName)* (':' varName)?
+functName returns [LuaType type]
+    : fn=varName ('.' varName)* (':' varName)?
+    // the OO notation is not supported yet
+    { $type = $fn.type; }
     ;
-
-functBody
-    : '(' parList? ')' anyTypeCast? block 'end'
-    ;
-
+    
 varList returns [SequenceType type]
     :  var (',' vl=varList)?
     { LuaType o = $var.type;
@@ -264,6 +264,18 @@ varList returns [SequenceType type]
     }
     ;
 
+var returns [LuaType type] 
+    : ( varNameAndType | '(' exp ')' vs=varSuffix ) varSuffix*
+    { $type = LuaAnalyser.mkNewGenVarType(); }
+    ;
+    
+varSuffix returns [LuaType type]
+    : nameAndArgs* '[' exp ']' 
+    { $type = $exp.type; } 
+    | nameAndArgs* '.' varName
+    { $type = LuaType._String; } 
+    ;
+    
 nameList returns [SequenceType type]
     :  varNameAndType (',' nl=nameList)?
     { LuaType o = $varNameAndType.type;
@@ -295,101 +307,104 @@ expList returns [SequenceType type]
          $type = new SequenceType(o);
     }
     ;
-    
-parList returns [SequenceType type]
-    : nameList (',' '...')? // '...' is not supported yet
-    { $type = $nameList.type; }
-    | '...'
-    { $type = new SequenceType (LuaType._Bottom); } // ',,,' not supported yet
-    ;
 
 exp returns [LuaType type]
     : 'nil' 
-    { $type = LuaType._Nil;}                                        # NilExp // ENil
+    { $type = LuaType._Nil; // Nil
+      LuaAnalyser.reportRule("Nil");
+    } # NilExp 
     | 'false'
-    { $type = LuaType._Boolean;}                                    # FalseExp // Bool
+    { $type = LuaType._Boolean; // Bool
+      LuaAnalyser.reportRule("Bool");
+    } # FalseExp 
     | 'true'
-    { $type = LuaType._Boolean;}                                    # TrueExp // Bool
+    { $type = LuaType._Boolean; // Bool
+      LuaAnalyser.reportRule("Bool");
+    } # TrueExp 
     | number 
-    { $type = $number.type;}                                        # NumberExp
+    { $type = $number.type;
+    } # NumberExp
     | string
-    { $type = LuaType._String;}                                     # StringExp // Str
+    { $type = LuaType._String; // Str
+      LuaAnalyser.reportRule("Str");
+    } # StringExp 
     | '...'
-    { $type = LuaType._Bottom; }  /** not supported yet **/         # VarArgExp 
+    { $type = LuaType._Bottom; /** not supported yet **/
+    } # VarArgExp 
     | functDef
-    { $type = $functDef.type;}                                      # FunctDefExp
+    { $type = $functDef.type;
+    } # FunctDefExp
     | prefixExp 
-    { $type = $prefixExp.type;}                                     # PrefixExpExp
+    { $type = $prefixExp.type;
+    } # PrefixExpExp
     | tableConstructor 
-    { $type = $tableConstructor.type;}                              # TableContructorExp
+    { $type = $tableConstructor.type;
+    } # TableContructorExp
     | <assoc=right> exp operatorPower exp
-    { $type = LuaAnalyser.opReturnType($operatorPower.text); }      # PowerOpExp
+    { $type = LuaAnalyser.opReturnType($operatorPower.text); 
+    } # PowerOpExp
     | operatorUnary exp
-    { $type = LuaAnalyser.opReturnType($operatorUnary.text); }      # UnaryOpExp
+    { $type = LuaAnalyser.opReturnType($operatorUnary.text); 
+    } # UnaryOpExp
     | exp operatorMulDivMod exp
-    { $type = LuaAnalyser.opReturnType($operatorMulDivMod.text); }  # MulDivModOpExp
+    { $type = LuaAnalyser.opReturnType($operatorMulDivMod.text); 
+    } # MulDivModOpExp
     | exp operatorAddSub exp
-    { $type = LuaAnalyser.opReturnType($operatorAddSub.text); }     # AddSubOpExp
+    { $type = LuaAnalyser.opReturnType($operatorAddSub.text); 
+    } # AddSubOpExp
     | <assoc=right> exp operatorStrCat exp
-    { $type = LuaAnalyser.opReturnType($operatorStrCat.text); }     # StrCatOpExp
+    { $type = LuaAnalyser.opReturnType($operatorStrCat.text); 
+    } # StrCatOpExp
     | exp operatorComparison exp
-    { $type = LuaAnalyser.opReturnType($operatorComparison.text); } # CompOpExp
+    { $type = LuaAnalyser.opReturnType($operatorComparison.text); 
+    } # CompOpExp
     | exp operatorAnd exp
-    { $type = LuaAnalyser.opReturnType($operatorAnd.text); }        # AndOpExp
+    { $type = LuaAnalyser.opReturnType($operatorAnd.text); 
+    } # AndOpExp
     | exp operatorOr exp
-    { $type = LuaAnalyser.opReturnType($operatorOr.text); }         # OrOpExp 
+    { $type = LuaAnalyser.opReturnType($operatorOr.text); 
+    } # OrOpExp 
     | exp operatorBitwise exp
-    { $type = LuaAnalyser.opReturnType($operatorBitwise.text); }    # BitOpExp
-    | e=exp typeCast
-    { $type = $e.type; }                                            # TypeCastExp 
+    { $type = LuaAnalyser.opReturnType($operatorBitwise.text); 
+    } # BitOpExp
+    | e=exp typeAscr
+    { $type = $e.type; 
+    } # TypeAscrExp 
     ;
 
-prefixExp returns [LuaType type]
-    : varOrExp 
-    { $type = $varOrExp.type; }
-    | functCall 
-    { $type = $functCall.type; }
+prefixExp returns [LuaType type] 
+    : varOrExp nameAndArgs*
+    { $type = LuaAnalyser.mkNewGenVarType(); }
     ;
 
-functCall returns [VarType type]
-    : varOrExp nameAndArgs
-    { $type = new VarType(LuaAnalyser.genVarName()); }
+functionCall 
+    : varOrExp nameAndArgs+
     ;    
-    
+
 varOrExp returns [LuaType type]
     : var 
     { $type = $var.type; } 
     | '(' exp ')'
     { $type = $exp.type; } 
     ;
-  
-var returns [VarType type]
-    : ( varNameAndType | '(' exp ')' ) varSuffix* 
-    { $type = new VarType(LuaAnalyser.genVarName()); }
-    ;
-
-varSuffix returns [LuaType type]
-    : '[' exp ']' 
-    { $type = $exp.type; } 
-    | '.' varName
-    { $type = LuaType._Bottom; } 
-    ; // the '.' is a definable construction, not supported yet  
 
 nameAndArgs returns [LuaType type]
     : (':' varName)? args
-    { if ($varName.text == null)
-         $type = $args.type;
-      else 
+    { if ($varName.text != null)
          $type = LuaType._Bottom;
-    } // the ':' is a definable construction, not supported yet
+      else
+         $type = $args.type; } 
+    // this OO notation is not supported yet
     ;
-
+    
 args returns [SequenceType type]
     : '(' expList? ')' 
     { if ($expList.text != null) 
          $type = $expList.type;
-      else 
+      else {
          $type = new SequenceType (LuaType._Bottom); // ESeq
+         LuaAnalyser.reportRule("ESeq");
+      }
     }
     | tableConstructor 
     { $type = new SequenceType ($tableConstructor.type); }
@@ -399,17 +414,28 @@ args returns [SequenceType type]
 
 functDef returns [LuaType type]
     : 'function' functBody
-    { $type = LuaAnalyser.unbindVariables(
-                 LuaType.copy(
-                    LuaTypeSystem._genericFunctionType)); } 
+    { $type = LuaAnalyser.mkNewUnbGenFunctType(); }
+    ;
+
+functBody
+    : '(' parList? ')' anyTypeAscr? block 'end'
+    ;
+    
+parList returns [SequenceType type]
+    : nameList (',' '...')? // '...' is not supported yet
+    { $type = $nameList.type; }
+    | '...'
+    { $type = new SequenceType (LuaType._Bottom); } // ',,,' not supported yet
     ;
 
 tableConstructor returns [TableType type]
     : '{' fieldList? '}'
     { if ($fieldList.text != null) 
          $type = $fieldList.type;
-      else
+      else {
          $type = LuaType._Table; // ETab
+         LuaAnalyser.reportRule("ETab");
+      }
     }
     ;
 
@@ -434,50 +460,62 @@ field returns [TableType type]
     
 number returns [LuaType type]
     : INTEGER 
-    { if (LuaType.isInt(Long.valueOf($INTEGER.text)))
+    { if (LuaType.isInt(Long.valueOf($INTEGER.text))) { // Num
          $type = LuaTypeSystem.getNDefault()==0?LuaType._Number:
-                 (LuaTypeSystem.getIDefault()==0?LuaType._Integer:
-                     LuaTypeSystem.getIDefault()==1?LuaType._Long:
-                        LuaType._Int); // Integer
-      else
+                 (LuaTypeSystem.getIDefault()==0?LuaType._Integer: // Integer
+                     LuaTypeSystem.getIDefault()==1?LuaType._Long: // Long
+                        LuaType._Int);
+         LuaAnalyser.reportRule("Num | Long | Integer");
+      } else {
          $type = LuaType._Long; // Long
+         LuaAnalyser.reportRule("Long");
+      }
     }
     | HEX 
-    { if (LuaType.isInt(Long.decode($HEX.text)))  
+    { if (LuaType.isInt(Long.decode($HEX.text))) { // Num 
          $type = LuaTypeSystem.getNDefault()==0?LuaType._Number:
-                 (LuaTypeSystem.getIDefault()==0?LuaType._Integer:
-                     LuaTypeSystem.getIDefault()==1?LuaType._Long:
-                        LuaType._Int); // Integer
-      else
-         $type = LuaType._Long; // Long 
+                 (LuaTypeSystem.getIDefault()==0?LuaType._Integer: // Integer
+                     LuaTypeSystem.getIDefault()==1?LuaType._Long: // Long
+                        LuaType._Int);
+         LuaAnalyser.reportRule("Num | Long | Integer");
+    } else {
+         $type = LuaType._Long; // Long
+         LuaAnalyser.reportRule("Long");
+      }
     }
     | FLOAT 
-    { if (LuaType.isSingle(Double.valueOf($FLOAT.text))) 
-         $type = LuaTypeSystem.getFDefault()==0?LuaType._Float:
-                    (LuaTypeSystem.getFDefault()==1)?LuaType._Double:
-                       LuaType._Single; // Floeat
-      else
+    { if (LuaType.isSingle(Double.valueOf($FLOAT.text))) { // Num
+         $type = LuaTypeSystem.getFDefault()==0?LuaType._Float: // Float
+                    (LuaTypeSystem.getFDefault()==1)?LuaType._Double: // Double
+                       LuaType._Single;
+         LuaAnalyser.reportRule("Num | Float | Double");
+      } else {
          $type = LuaType._Double; // Double
+         LuaAnalyser.reportRule("Double");
+      }
     }
     | HEX_FLOAT
-    { if (LuaType.isSingle(Double.valueOf($HEX_FLOAT.text)))
-         $type = LuaTypeSystem.getFDefault()==0?LuaType._Float:
-                    LuaTypeSystem.getFDefault()==1?LuaType._Double:
-                       LuaType._Single; // Floeat
-      else
-         $type = LuaType._Double; // Double 
+    { if (LuaType.isSingle(Double.valueOf($HEX_FLOAT.text))) { // Num
+         $type = LuaTypeSystem.getFDefault()==0?LuaType._Float: // Float
+                    LuaTypeSystem.getFDefault()==1?LuaType._Double: // Double
+                       LuaType._Single; 
+         LuaAnalyser.reportRule("Num | Float | Double");                 
+      } else {
+         $type = LuaType._Double; // Double
+         LuaAnalyser.reportRule("Double");
+      }
     }
     ;
 
-varName returns [VarType type]
+varName returns [LuaType type] 
     : NAME
-    { $type = new VarType(LuaAnalyser.genVarName()); }
+    { $type = LuaAnalyser.mkNewGenVarType(); }
     ;
     
 varNameAndType returns [LuaType type]
-    : varName typeCast?
+    : varName typeAscr?
     { $type = $varName.type; }
-    | '(' varName typeCast ')'
+    | '(' varName typeAscr ')'
     { $type = $varName.type; }
     ;
 
@@ -518,7 +556,7 @@ string
     | LONGSTRING   
     ;
 
-// LEXER
+/* Lexer */
 
 NAME
     : [a-zA-Z_][a-zA-Z_0-9]*

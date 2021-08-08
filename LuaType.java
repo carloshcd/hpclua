@@ -36,10 +36,11 @@ import java.io.ObjectOutputStream;
 import java.io.ObjectInputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Set;
 
 public class LuaType extends Symbol implements Serializable, Type {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 7L;
     
     int typeIndex;
  
@@ -68,21 +69,32 @@ public class LuaType extends Symbol implements Serializable, Type {
         this.typeIndex = i;
     }
 
-    public LuaType(String n, int i) {
-        super(n);
-        this.typeIndex = i;
-    }
-
+    @Override
     public int getTypeIndex() { 
-        return typeIndex; 
+        return this.typeIndex; 
     }
-    
-    public String toString() { 
-        return getName();
-    }
-    
-    public LuaType expand(Scope s) {
-       return this;
+   
+    @Override 
+    public String toString() {
+       String name = "";
+       switch (this.getTypeIndex()) {
+          case tNIL: name = "Nil"; break;
+          case tBOOLEAN: name = "Boolean"; break;
+          case tSTRING: name = "String"; break;
+          case tNUMBER: name = "Number"; break;
+          case tINT: name = "Int"; break;
+          case tLONG: name = "Long"; break;
+          case tSINGLE: name = "Single"; break;
+          case tDOUBLE: name = "Double"; break;
+          case tVAR: name = "TVar"; break;
+          case tTHREAD: name = "Thread"; break;
+          case tUSERDATA: name = "UserData"; break;
+          case tANY: name = "Any"; break;
+          case tUNION: name = "Union"; break;
+          case tSEQUENCE: name = "Sequence"; break;
+          case tQUANT: name = "Quantified"; break;
+       }
+       return name;
     }
     
     public boolean equals(Object t) {
@@ -93,15 +105,20 @@ public class LuaType extends Symbol implements Serializable, Type {
         if (!getClass().equals(t.getClass()))
             return false;
         LuaType other = (LuaType) t;
-        return (this.typeIndex == other.getTypeIndex());
+        return (this.getTypeIndex() == other.getTypeIndex());
     }
-    
+   
+    @Override 
     public int hashCode() {
-       return tOTHER + this.typeIndex;
+       return tOTHER + this.getTypeIndex();
+    }
+
+    public LuaType expand(Scope s) {
+       return this;
     }
 
     public boolean isBasicTypeTag() {
-       switch (typeIndex) {
+       switch (this.getTypeIndex()) {
           case tNIL:
           case tBOOLEAN:
           case tSTRING:
@@ -114,7 +131,7 @@ public class LuaType extends Symbol implements Serializable, Type {
     }
     
     public boolean isNumTypeTag() {
-       switch (typeIndex) {
+       switch (this.getTypeIndex()) {
           case tINT:
           case tLONG:
           case tSINGLE:
@@ -126,7 +143,7 @@ public class LuaType extends Symbol implements Serializable, Type {
     }
 
     public boolean isStructTypeTag() {
-       switch (typeIndex) {
+       switch (this.getTypeIndex()) {
           case tTHREAD:
           case tUSERDATA:
           case tANY:
@@ -153,43 +170,45 @@ public class LuaType extends Symbol implements Serializable, Type {
     }
     
     public boolean subtype(LuaType t) {
-       if (t.equals(_Any))                // TTop
+       if (t.equals(LuaType._Any)) // TTop
           return true;
        else if (this.isTTag() && 
-                this.equals(t))          // TCRefl
+                this.equals(t)) // TCRefl
           return true;
-       else if (this.equals(_Int) &&     // TInt
+       else if (this.equals(_Int) && // TInt
                 t.equals(_Number))
           return true;
-       else if (this.equals(_Long) &&    // TLong
+       else if (this.equals(_Long) && // TLong
                 t.equals(_Number))
           return true;
-       else if (this.equals(_Single) &&  // TSingle
+       else if (this.equals(_Single) && // TSingle
                 t.equals(_Number))
           return true; 
-       else if (this.equals(_Double) &&  // TDouble
+       else if (this.equals(_Double) && // TDouble
                 t.equals(_Number))
           return true;
-       else if (this.equals(_Int) &&     // TIL
+       else if (this.equals(_Int) && // TIL
                 t.equals(_Long))
           return true;
-       else if (this.equals(_Single) &&  // TSD
+       else if (this.equals(_Single) && // TSD
                 t.equals(_Double))
           return true;
-       else if (t instanceof UnionType)  // TUSup
+       else if (t instanceof SequenceType) // TSeq
+          return ((SequenceType) t).TSeq(this);
+       else if (t instanceof UnionType) // TUSup
           return ((UnionType) t).TUSup(this);
        return false;       
     }
     
     public LuaType subst(LuaType v, LuaType t) { 
       if (this.equals(v)) 
-         return copy(t);
+         return LuaType.copy(t);
       else
          return this;
     }
     
     public LuaType subst(Scope s) {
-       return copy(this);
+       return this;
     }
     
     public List<VarType> freeTVars() {
@@ -198,8 +217,8 @@ public class LuaType extends Symbol implements Serializable, Type {
     
     public static List<VarType> freeTVars(Scope s) {
        List<VarType> freeTVars = new ArrayList<VarType>();
-       Map<String,Symbol> m = s.getSymbols();
-       for(Map.Entry<String, Symbol> me : m.entrySet()) {
+       Set<Map.Entry<String,Symbol>> mes = s.getSymbols().entrySet();
+       for(Map.Entry<String, Symbol> me : mes) {
           LuaType type = (LuaType) me.getValue().getType();
           List<VarType> ftv = type.freeTVars();
           freeTVars.addAll(ftv);
@@ -210,7 +229,6 @@ public class LuaType extends Symbol implements Serializable, Type {
     public static LuaType copy(LuaType orig) {
         LuaType obj = null;
         try {
-        
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             ObjectOutputStream out = new ObjectOutputStream(bos);
             out.writeObject(orig);
@@ -220,124 +238,134 @@ public class LuaType extends Symbol implements Serializable, Type {
             ObjectInputStream in = new ObjectInputStream(
                 new ByteArrayInputStream(bos.toByteArray()));
             obj = (LuaType) in.readObject();
+            in.close();
+            bos.close();
         }
-        catch(IOException e) {
+        catch (IOException e) {
             e.printStackTrace();
         }
-        catch(ClassNotFoundException cnfe) {
+        catch (ClassNotFoundException cnfe) {
             cnfe.printStackTrace();
         }
         return obj;
     }
     
-    public static Scope delta(Scope s, VarType n, LuaType t) {
+    public static Scope delta(Scope s, VarType n, LuaType t, int verb) { 
+       if ( verb > 1 ) 
+          System.out.printf("Entering delta()\n");
        String name = n.getVarName();
        Symbol symb = s.resolveName(name); 
-       if (symb != null) {
-          int line = symb.getLine();
-          symb.getScope().defineName(new VariableSymbol(name, t, line));
-       } else 
-          s = null;
+       if (symb != null) 
+          symb.getScope().defineName(new VariableSymbol(name, t, 
+                                            symb.getLine()), verb);
        return s;
     }      
 
-    public static Scope extend(Scope s, VarType n, LuaType t) {
+    public static Scope extend(Scope s, VarType n, LuaType t, int verb) {
+       if ( verb > 1 )
+          System.out.printf("Entering extend()\n");
        Symbol symb = s.resolveName(n.getVarName());
-       if (symb != null && symb.getType().equals(n))
+       if (symb != null && symb.getType().equals(t)) { 
+          System.out.printf("There\n");
           return s;
-       else {
+       } else {
           List<VarType> tvars = t.freeTVars();
-          if (tvars != null && tvars.contains(n))
+          if (tvars != null && tvars.contains(n)) 
              return null;
           else 
-             return delta(s, n, t);
+             return delta(s, n, t, verb);
        }
     }
 
-    public Scope unifiesWith (Scope s, LuaType t) {
-       if (this.equals(_Any) || t.equals(_Any)) 
+    public Scope unifiesWith(Scope s, LuaType t, int verb) {
+       if ( verb > 1 )
+          System.out.printf("Unifying LuaType: %s/%s\n", this, t);
+       if (t.equals(LuaType._Any) || 
+           this.equals(LuaType._Any)) 
           return s;
        else
           if (t instanceof VarType || t instanceof UnionType)
-             return t.unifiesWith(s, this);
+             return t.unifiesWith(s,this,verb);
           else 
-             if (t.subtype(this) || this.subtype(t))
+             if (t.subtype(this) || this.subtype(t)) 
                return s;
              else 
                 return null;
     }
-    
-    public static Scope unifiesLists (Scope s, List<LuaType> l1, List<LuaType> l2, boolean samesize) {
-       Scope result = s; 
-       LuaType obj1, obj2;
-       if (samesize && l1.size() != l2.size())
-          return null;
-       for(int i=0;i<l1.size();i++) {
+
+    public static Scope unifiesLists(Scope s,
+                                     List<LuaType> l1, List<LuaType> l2, 
+                                     int verb) {
+       if ( verb > 1 ) 
+          System.out.printf("Unifying Lists: %s/%s\n", l1, l2);
+       Scope result = s;
+       LuaType obj1;
+       LuaType obj2;
+       int nel = l1.size();
+       for(int i=0;i<nel;i++) {
           obj1 = l1.get(i);
           if (i >= l2.size())
              obj2 = _Nil;
           else
              obj2 = l2.get(i);
-          Scope s1 = obj1.unifiesWith(result, obj2);
-          if (s1 != null)  
+          if ( verb > 1 ) 
+             System.out.printf("Unifying Itens [%d/%d]:\n", i+1, l1.size());
+          Scope s1 = obj1.unifiesWith(result,obj2,verb);
+          if (s1 == null) { 
+             result = null;
+             break;
+          } else
              result = s1;
-          else
-             return null;
        }
        return result;
     }
     
-    public static LuaType expand(Scope s, String name) {
-        boolean stop = false;
-        LuaType type = LuaType._Bottom;
-        while (!stop) {
-           Symbol var = s.resolveName(name);
-           if (var == null)
-              stop = true;
-           else {
-              type = (LuaType) var.getType();
-              if (type instanceof VarType && !type.equals(VarType._Unknown))
-                 name = ((VarType) type).getVarName();
+    public static LuaType expand(Scope s, LuaType type) {
+        LuaType obj = type;
+        while (obj instanceof VarType) {
+           Symbol symb = s.resolveName(((VarType) obj).getVarName());
+           if (symb != null) {
+              LuaType ntype = (LuaType) symb.getType();
+              if (ntype == null || ntype.equals(VarType._Unknown))
+                 break;
               else
-                 stop = true;
-           }
+                 obj = ntype;
+           } else
+              break;
         }
-        if (type.equals(VarType._Unknown))
-           type = LuaType._Bottom;
-        return type;
+        return obj;
     }
     
     public static final LuaType _Nil =
-        new LuaType("Nil", tNIL);
+        new LuaType(tNIL);
     public static final LuaType _Boolean =
-        new LuaType("Boolean", tBOOLEAN);
+        new LuaType(tBOOLEAN);
     public static final LuaType _String =
-        new LuaType("String", tSTRING);
+        new LuaType(tSTRING);
     public static final LuaType _Number =
-        new LuaType("Number", tNUMBER);
+        new LuaType(tNUMBER);
     public static final LuaType _Int =
-        new LuaType("Int", tINT);
+        new LuaType(tINT);
     public static final LuaType _Long =
-        new LuaType("Long", tLONG);
+        new LuaType(tLONG);
     public static final LuaType _Single =
-        new LuaType("Single", tSINGLE);
+        new LuaType(tSINGLE);
     public static final LuaType _Double =
-        new LuaType("Double", tDOUBLE);
+        new LuaType(tDOUBLE);
     public static final LuaType _Var =
-        new LuaType("TVar", tVAR);
+        new LuaType(tVAR);
     public static final LuaType _Thread =
-        new LuaType("Thread", tTHREAD);
+        new LuaType(tTHREAD);
     public static final LuaType _UserData =
-        new LuaType("UserData", tUSERDATA);
+        new LuaType(tUSERDATA);
     public static final LuaType _Any =
-        new LuaType("Any", tANY);
-
+        new LuaType(tANY);
     public static final LuaType _Union =
-        new LuaType("Union", tUNION);
+        new LuaType(tUNION);
     public static final LuaType _Sequence =
-        new LuaType("Sequence", tSEQUENCE);
+        new LuaType(tSEQUENCE);
     public static final LuaType _Quantified =
-        new LuaType("Quantified", tQUANT);
+        new LuaType(tQUANT);
         
     public static final UnionType _Bottom = 
         new UnionType (); 
@@ -345,24 +373,29 @@ public class LuaType extends Symbol implements Serializable, Type {
         new TableType (); 
     public static final FunctionType _Function = 
        new FunctionType (_Bottom, _Any);
+    public static final SequenceType _Sequence1 = 
+       new SequenceType (
+          new ArrayList<LuaType>() {
+             private static final long serialVersionUID = 701L; {
+             add(_Any); add(_Sequence1); }});
     
     protected static final List<LuaType> _elemInteger = 
        new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
+        private static final long serialVersionUID = 702L; {
         add(_Int); add(_Long); }};
     public static final UnionType _Integer = 
        new UnionType(new SequenceType (_elemInteger));
     
     protected static final List<LuaType> _elemFloat = 
        new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
+        private static final long serialVersionUID = 703L; {
         add(_Single); add(_Double); }};
     public static final UnionType _Float = 
        new UnionType(new SequenceType(_elemFloat));
           
     protected static final List<LuaType> _elemObject =
        new ArrayList<LuaType>() {        
-        private static final long serialVersionUID = 1L; {
+        private static final long serialVersionUID = 704L; {
         add(_Thread); add(_UserData); 
         add(_Table); add(_Function);}};
     public static final UnionType _Object = 
@@ -370,7 +403,7 @@ public class LuaType extends Symbol implements Serializable, Type {
           
     public static final Map<Integer,LuaType> _BuiltInTypes = 
         new HashMap<Integer,LuaType>() {
-        private static final long serialVersionUID = 1L; {
+        private static final long serialVersionUID = 705L; {
 
         put(tANY, _Any); 
  
@@ -403,5 +436,43 @@ public class LuaType extends Symbol implements Serializable, Type {
                
     public static boolean isSingle(Double n) {
        return ((Float.MIN_VALUE <= n) && (n <= Float.MAX_VALUE));
+    }
+
+    public LuaType select(Scope s, LuaType t, int vetb) {
+       if (this.equals(_String) && t.subtype(_Number))
+          return _Int;
+       else
+          return _Bottom;
+    } 
+
+    public static boolean isSelectable(LuaType t) {
+        return (t instanceof TableType ||
+                t instanceof SequenceType ||
+                (t instanceof LuaType && 
+                 t.equals(LuaType._String)));
+    }
+
+    public String fold() {
+       return this.toString();
+    }
+    
+    public boolean isBasicNumericType() {
+       return this.isNumTypeTag() || 
+              this.equals(_Number);
+    }
+    
+    public boolean isNumericType() {
+       return this.isBasicNumericType();
+    }
+    
+    public boolean hasJustNumericKeys() {
+       return false;
+    }
+    
+    public LuaType mostGeneralNumericType() {
+       if (this.isBasicNumericType())
+          return this;
+       else
+          return null;
     }
 }

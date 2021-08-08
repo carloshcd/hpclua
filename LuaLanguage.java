@@ -27,10 +27,6 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
 import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Collections;
 
 public class LuaLanguage implements Language { 
 
@@ -41,29 +37,40 @@ public class LuaLanguage implements Language {
 
     public static final String varPrefix = 
        VariableSymbol.genPrefix + "v" + VariableSymbol.genPrefix;
-    public static final String returnVarPrefix = 
-       VariableSymbol.genPrefix + "ret" + VariableSymbol.genPrefix;
+    public static final String outVarPrefix = 
+       VariableSymbol.genPrefix + "out" + VariableSymbol.genPrefix;
+    public static final String inVarPrefix =
+       VariableSymbol.genPrefix + "in" + VariableSymbol.genPrefix;
+    public static final String forVarPrefix = 
+       VariableSymbol.genPrefix + "for" + VariableSymbol.genPrefix;
     
-    public static final BaseScope _GlobalBuiltInScope = 
-       new BaseScope(LuaTypeSystem._BuiltInSymbols);
+    public static final GlobalScope _GlobalBuiltInScope = 
+       new GlobalScope(LuaTypeSystem._BuiltInSymbols);
     
-    public LuaLanguage(int n, int f, int i) {
+    public LuaLanguage(int n, int f, int i, int s) {
        this.name = "Lua"; 
        this.extension = "lua"; 
-       this.typeSystem = new LuaTypeSystem(n, f, i);
-       this.builtInSymbols = new GlobalScope(null);
+       this.typeSystem = new LuaTypeSystem(n, f, i, s);
+       this.builtInSymbols = new GlobalScope();
 
         Map<Integer,Type> types = typeSystem.getTypes();
         for (int j = 0;j<types.size();j++) {
            LuaType t = (LuaType) types.get(j);
-           builtInSymbols.defineName(t);
+           builtInSymbols.defineName(t,0);
         }
         
         builtInSymbols.mergeWith(_GlobalBuiltInScope);
     }
 
+    @Override
     public String getName() { return name; }
+
+    @Override
     public String getExt() { return extension; }
+
+    @Override
     public TypeSystem getTypeSystem() { return typeSystem; }
+
+    @Override
     public GlobalScope getBuiltIns() { return builtInSymbols; }
 }

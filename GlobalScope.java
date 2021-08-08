@@ -28,11 +28,25 @@
   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-***/
+***/ 
+import java.util.HashMap;
+import java.util.List;
+
 public class GlobalScope extends BaseScope {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 5L;
     
-    public GlobalScope(Scope enclosingScope) { super(enclosingScope); }
+    public GlobalScope() { 
+       super(null); 
+    }
+
+    public GlobalScope(List<Symbol> l) {
+       super();
+       this.symbols = new HashMap<String, Symbol>();
+       for (Symbol symb : l) 
+          this.defineName(symb,0);
+    }
+
+    @Override
     public String getScopeName() { return "globals"; }
 }

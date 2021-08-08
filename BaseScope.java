@@ -6,7 +6,7 @@
 
   [The "BSD license"]
   Copyright (c) 2012 Terence Parr
-  Portions Copyright (c) Carlos Henrique Cabral Duarte
+  Portions Copyright (c) 2019 Carlos Henrique Cabral Duarte
   All rights reserved.
   
   Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,6 @@
 ***/
 import java.util.HashMap;
 import java.util.Map;
-import java.util.List;
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ObjectOutputStream;
@@ -47,83 +46,67 @@ public class BaseScope implements Scope, Serializable {
     Map<String, Symbol> symbols;
     Scope enclosingScope; 
     
-    public BaseScope(List<Symbol> l) {
-       this.symbols = new HashMap<String, Symbol>();
-       for (Symbol symb : l)
-           this.defineName(symb);
+    public BaseScope() {
        this.enclosingScope = null;
-    }
-    
+    }    
+
     public BaseScope(Scope s) { 
        this.symbols = new HashMap<String, Symbol>();
        this.enclosingScope = s;  
     }
-    
+   
+    @Override 
     public Scope getEnclosingScope() { return this.enclosingScope; }
-    
+   
+    @Override 
     public void setEnclosingScope(Scope s) { this.enclosingScope = s; }
-
+ 
+    @Override
     public Map<String,Symbol> getSymbols() { return this.symbols; }
-    
+   
+    @Override 
     public void setSymbols(Map<String,Symbol> s) { this.symbols = s; }
-    
-    public String getScopeName() { return "scope"; }
-        
-    public void defineName(Symbol symb) {
+   
+    @Override 
+    public void defineName(Symbol symb, int verb) {
         symbols.put(symb.getName(), symb);
         symb.setScope(this); 
+        if ( verb > 1) 
+           System.out.printf("Def: [%s]\n", symb);
     }
-    
+   
+    @Override  
     public Symbol resolveName(String n) {
-        Symbol symb = symbols.get(n);
-        if ( symb !=null ) 
-           return symb;
-        else
-           if ( enclosingScope != null ) 
-              return enclosingScope.resolveName(n);
+        Scope scope = this;
+        do { 
+           Symbol symb = scope.getSymbols().get(n);
+           if (symb == null) 
+              scope = scope.getEnclosingScope();
            else
-              return null; 
+              return symb;
+        } while (scope != null);
+        return null;
     }
 
-    public Symbol getEnclosingFunction() {
-       if (enclosingScope != null) 
-          return enclosingScope.getEnclosingFunction();
-       else
+    @Override
+    public String getScopeName() { return "scope"; }
+
+    @Override
+    public FunctionSymbol getEnclosingFunction(boolean anon) {
+       if (enclosingScope == null) 
           return null;
+       else
+          return enclosingScope.getEnclosingFunction(anon);
     }
 
+    @Override
     public String toString() { 
        return getScopeName()+":"+symbols.keySet().toString(); 
     }
 
-    public Scope copy() {
-        BaseScope obj = null;
-        try {
-        
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutputStream out = new ObjectOutputStream(bos);
-            out.writeObject(this);
-            out.flush();
-            out.close();
-
-            ObjectInputStream in = new ObjectInputStream(
-                new ByteArrayInputStream(bos.toByteArray()));
-            obj = (BaseScope) in.readObject();
-        }
-        catch(IOException e) {
-            e.printStackTrace();
-        }
-        catch(ClassNotFoundException cnfe) {
-            cnfe.printStackTrace();
-        }
-        return obj;
-    }
-    
+    @Override 
     public void mergeWith(Scope s) {
-       if (s != null) {
-          Map<String,Symbol> m = s.getSymbols();
-          for(Map.Entry<String, Symbol> me : m.entrySet())
-             this.symbols.put(me.getKey(), me.getValue());
-       }
+       if (s != null)  
+          this.getSymbols().putAll(s.getSymbols());
     }
 }

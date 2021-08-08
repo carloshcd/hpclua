@@ -1,0 +1,3 @@
+#/bin/sh
+stat --printf="-- %n, v1.0, %y, %U\n-- Please see copyright notice in file dotests\n" $1
+

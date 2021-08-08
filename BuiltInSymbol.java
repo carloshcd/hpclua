@@ -28,8 +28,6 @@
 ***/
 public class BuiltInSymbol extends Symbol {
 
-    private static final long serialVersionUID = 1L;
-
     public BuiltInSymbol(String name, Type type) {
         super(name, type);
     }

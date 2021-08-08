@@ -32,60 +32,73 @@
 ***/
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectInputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.Boolean;
 
-public class FunctionSymbol extends Symbol implements Scope, Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class FunctionSymbol extends Symbol implements Scope {
 
     Map<String,Symbol> symbols;
     Scope enclosingScope;
-
+    List<FunctionSymbol> calledFuncts;
+    Boolean dealsJustWithNumKeyTables;
+    
     public FunctionSymbol(String n, Type t, Scope s) {
         super(n, t);
         this.symbols = new HashMap<String,Symbol>();
         this.enclosingScope = s;
+        this.calledFuncts = new ArrayList<FunctionSymbol>();
+        this.dealsJustWithNumKeyTables = null;
     }
 
     public FunctionSymbol(String n, Type t, int l, Scope s) {
         super(n, t, l);
         this.symbols = new HashMap<String,Symbol>();
         this.enclosingScope = s;
+        this.calledFuncts = new ArrayList<FunctionSymbol>();
+        this.dealsJustWithNumKeyTables = null;
     }
 
+    @Override
     public Scope getEnclosingScope() { return this.enclosingScope; }
-    
+   
+    @Override 
     public void setEnclosingScope(Scope s) { this.enclosingScope = s; }
-    
+   
+    @Override 
     public Map<String, Symbol> getSymbols() { return this.symbols; }
-    
+   
+    @Override 
     public void setSymbols(Map<String, Symbol> s) { this.symbols = s; }    
     
-    public void defineName(Symbol symb) {
-        symbols.put(symb.getName(), symb);
-        symb.setScope(this);  
+    @Override 
+    public void defineName(Symbol symb, int verb) {
+       symbols.put(symb.getName(), symb);
+       symb.setScope(this);  
+       if ( verb > 1 )   
+          System.out.printf("Def: [%s]\n", symb);
     }
-    
+   
+    @Override 
     public Symbol resolveName(String n) {
-        Symbol symb = symbols.get(n);
-        if ( symb != null ) 
-           return symb;
-        else
-           if ( getEnclosingScope() != null ) 
-              return getEnclosingScope().resolveName(n);
-           else
-              return null; 
-    }
- 
-    public Symbol getEnclosingFunction() {
-       return this;
+       Scope scope = this;
+       do { 
+          Symbol symb = scope.getSymbols().get(n);
+          if (symb == null) 
+             scope = scope.getEnclosingScope();
+          else
+             return symb;
+       } while (scope != null);
+       return null;
     }
 
+    @Override
     public String getScopeName() { return super.name; }
     
     @Override
@@ -98,34 +111,42 @@ public class FunctionSymbol extends Symbol implements Scope, Serializable {
        return s; 
     }
 
-    public Scope copy() {
-        FunctionSymbol obj = null;
-        try {
-        
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutputStream out = new ObjectOutputStream(bos);
-            out.writeObject(this);
-            out.flush();
-            out.close();
-
-            ObjectInputStream in = new ObjectInputStream(
-                new ByteArrayInputStream(bos.toByteArray()));
-            obj = (FunctionSymbol) in.readObject();
-        }
-        catch(IOException e) {
-            e.printStackTrace();
-        }
-        catch(ClassNotFoundException cnfe) {
-            cnfe.printStackTrace();
-        }
-        return obj;
-    }
-    
+    @Override 
     public void mergeWith(Scope s) {
-       if (s != null) {
-          Map<String,Symbol> m = s.getSymbols();
-          for(Map.Entry<String, Symbol> me : m.entrySet()) 
-             m.put(me.getKey(), me.getValue());
-       }
+       if (s != null) 
+          this.getSymbols().putAll(s.getSymbols());
+    }
+
+    @Override
+    public FunctionSymbol getEnclosingFunction(boolean anon) {
+       if (!isGen(this.getName()) || anon)
+          return this;
+       else
+          if (enclosingScope == null)
+             return null;
+          else
+             return enclosingScope.getEnclosingFunction(anon);
+    }
+
+    public List<FunctionSymbol> getCalledFuncts() { 
+       return this.calledFuncts; 
+    }
+
+    public void addCalledFunct(FunctionSymbol f) {
+       if (!this.equals(f))
+          this.calledFuncts.add(f);
+    }
+
+    public Boolean getDealsJustWithNumKeyTables() { 
+       return this.dealsJustWithNumKeyTables; 
+    }
+
+    public void setDealsJustWithNumKeyTables(boolean b) {
+       if (this.dealsJustWithNumKeyTables == null)
+          this.dealsJustWithNumKeyTables = b;
+       else 
+          if (this.dealsJustWithNumKeyTables.equals(Boolean.TRUE) && 
+              b == false)
+             this.dealsJustWithNumKeyTables = false;
     }
 }

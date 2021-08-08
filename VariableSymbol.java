@@ -31,12 +31,7 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
 
-/** Represents a variable definition (name,type) in symbol table */
 public class VariableSymbol extends Symbol {
-
-   private static final long serialVersionUID = 1L;
-
-   public static final String genPrefix = "_";
 
    public VariableSymbol(String name) { 
       super(name); 
@@ -48,9 +43,5 @@ public class VariableSymbol extends Symbol {
 
    public VariableSymbol(String name, Type type, int line) {
       super(name, type, line); 
-   }
-
-   public static boolean isGen(String name) {
-      return (name.startsWith(genPrefix));
    }
 }

@@ -42,11 +42,10 @@ public interface Scope {
 
     public String getScopeName();
 
-    public void defineName(Symbol symb);
+    public void defineName(Symbol symb, int verb);
     public Symbol resolveName(String name);
     
-    public Symbol getEnclosingFunction();
-
-    public Scope copy();    
     public void mergeWith(Scope s);
+
+    public FunctionSymbol getEnclosingFunction(boolean anon);
 }

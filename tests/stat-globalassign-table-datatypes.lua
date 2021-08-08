@@ -1,3 +1,5 @@
+-- stat-globalassign-table-datatypes.lua, v1.0, 2019-07-16 21:13:00.225409408 -0300, chcd
+-- Please see copyright notice in file dotests
 a = {}
 b = {"d"}
 c = {foo = "d"}

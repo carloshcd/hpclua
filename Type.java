@@ -28,8 +28,14 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
 public interface Type { 
-	public int getTypeIndex();
-	public String toString();
-	public boolean equals(Object t);
-	public int hashCode();
+    public int getTypeIndex();
+
+    @Override
+    public String toString();
+
+    @Override
+    public boolean equals(Object t);
+
+    @Override
+    public int hashCode();
 }

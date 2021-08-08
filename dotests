@@ -1,0 +1,176 @@
+# 
+#  dotests (copyright applies to all test files in the distribution)
+#
+#  [The "BSD license"]
+#  Copyright (c) 2019 Carlos Henrique Cabral Duarte
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. The name of the author may not be used to endorse or promote products
+#     derived from this software without specific prior written permission.
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+#  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+#  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+#  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+echo "block-empty.lua"
+./hpcluatool $* tests/block-empty.lua
+echo "block-return-empty.lua"
+./hpcluatool $* tests/block-return-empty.lua
+echo "block-return-nonempty.lua"
+./hpcluatool $* tests/block-return-nonempty.lua
+echo "stat-break.lua"
+./hpcluatool $* tests/stat-break.lua
+echo "stat-do-empty.lua"
+./hpcluatool $* tests/stat-do-empty.lua
+echo "stat-do-inoutscope.lua"
+./hpcluatool $* tests/stat-do-inoutscope.lua
+echo "stat-do-inscope-overriding.lua"
+./hpcluatool $* tests/stat-do-inscope-overriding.lua
+echo "stat-do-inscope.lua"
+./hpcluatool $* tests/stat-do-inscope.lua
+echo "stat-do-outscope.lua"
+./hpcluatool $* tests/stat-do-outscope.lua
+echo "stat-forlocalname-beg-end.lua"
+./hpcluatool $* tests/stat-forlocalname-beg-end.lua
+echo "stat-forlocalname-beg-end-step.lua"
+./hpcluatool $* tests/stat-forlocalname-beg-end-step.lua
+echo "stat-functcall-apply-succ.lua"
+./hpcluatool $* tests/stat-functcall-apply-succ.lua
+echo "stat-functcall-predef-ignore.lua"
+./hpcluatool $* tests/stat-functcall-predef-ignore.lua
+echo "stat-functcall-sequence-adjust.lua"
+./hpcluatool $* tests/stat-functcall-sequence-adjust.lua
+echo "stat-functcall-succ2.lua"
+./hpcluatool $* tests/stat-functcall-succ2.lua
+echo "stat-functcall-succ-funct.lua"
+./hpcluatool $* tests/stat-functcall-succ-funct.lua
+echo "stat-functcall-succ-ignore.lua"
+./hpcluatool $* tests/stat-functcall-succ-ignore.lua
+echo "stat-functcall-succ.lua"
+./hpcluatool $* tests/stat-functcall-succ.lua
+echo "stat-functstat-apply.lua"
+./hpcluatool $* tests/stat-functstat-apply.lua
+echo "stat-functstat-const.lua"
+./hpcluatool $* tests/stat-functstat-const.lua
+echo "stat-functstat-even.lua"
+./hpcluatool $* tests/stat-functstat-even.lua
+echo "stat-functstat-F.lua"
+./hpcluatool $* tests/stat-functstat-F.lua
+echo "stat-functstat-fat.lua"
+./hpcluatool $* tests/stat-functstat-fat.lua
+echo "stat-functstat-pair.lua"
+./hpcluatool $* tests/stat-functstat-pair.lua
+echo "stat-functstat-pingpong.lua"
+./hpcluatool $* tests/stat-functstat-pingpong.lua
+echo "stat-functstat-return-empty.lua"
+./hpcluatool $* tests/stat-functstat-return-empty.lua
+echo "stat-functstat-S.lua"
+./hpcluatool $* tests/stat-functstat-S.lua
+echo "stat-functstat-succ2.lua"
+./hpcluatool $* tests/stat-functstat-succ2.lua
+echo "stat-functstat-succ.lua"
+./hpcluatool $* tests/stat-functstat-succ.lua
+echo "stat-functstat-swap.lua"
+./hpcluatool $* tests/stat-functstat-swap.lua
+echo "stat-functstat-swap-pair.lua"
+./hpcluatool $* tests/stat-functstat-swap-pair.lua
+echo "stat-functstat-twice.lua"
+./hpcluatool $* tests/stat-functstat-twice.lua
+echo "stat-functstat-void.lua"
+./hpcluatool $* tests/stat-functstat-void.lua
+echo "stat-globalassign-functdef.lua"
+./hpcluatool $* tests/stat-globalassign-functdef.lua
+echo "stat-globalassign-ground-datatypes.lua"
+./hpcluatool $* tests/stat-globalassign-ground-datatypes.lua
+echo "stat-globalassign-multiple-equal.lua"
+./hpcluatool $* tests/stat-globalassign-multiple-equal.lua
+echo "stat-globalassign-multiple-moreleft.lua"
+./hpcluatool $* tests/stat-globalassign-multiple-moreleft.lua
+echo "stat-globalassign-multiple-moreright.lua"
+./hpcluatool $* tests/stat-globalassign-multiple-moreright.lua
+echo "stat-globalassign-predefined-functs1.lua"
+./hpcluatool $* tests/stat-globalassign-predefined-functs1.lua
+echo "stat-globalassign-predefined-functs2.lua"
+./hpcluatool $* tests/stat-globalassign-predefined-functs2.lua
+echo "stat-globalassign-predefined-ops.lua"
+./hpcluatool $* tests/stat-globalassign-predefined-ops.lua
+echo "stat-globalassign-sequence-adjust.lua"
+./hpcluatool $* tests/stat-globalassign-sequence-adjust.lua
+echo "stat-globalassign-single-multiple-nonoverriding.lua"
+./hpcluatool $* tests/stat-globalassign-single-multiple-nonoverriding.lua
+echo "stat-globalassign-single-multiple-overriding.lua"
+./hpcluatool $* tests/stat-globalassign-single-multiple-overriding.lua
+echo "stat-globalassign-subtype-ascr.lua"
+./hpcluatool $* tests/stat-globalassign-subtype-ascr.lua
+echo "stat-globalassign-supertype-ascr.lua"
+./hpcluatool $* tests/stat-globalassign-supertype-ascr.lua
+echo "stat-globalassign-single-unitary.lua"
+./hpcluatool $* tests/stat-globalassign-single-unitary.lua
+echo "stat-globalassign-table-datatypes.lua"
+./hpcluatool $* tests/stat-globalassign-table-datatypes.lua
+echo "stat-globalassign-table-indexing.lua"
+./hpcluatool $* tests/stat-globalassign-table-indexing.lua
+echo "stat-globalassign-table-nil-indexing.lua"
+./hpcluatool $* tests/stat-globalassign-table-nil-indexing.lua
+echo "stat-globalassign-table-matrix2x2.lua"
+./hpcluatool $* tests/stat-globalassign-table-matrix2x2.lua
+echo "stat-globalassign-table-matrix3x3.lua"
+./hpcluatool $* tests/stat-globalassign-table-matrix3x3.lua
+echo "stat-globalassign-table-matrix3x3x3.lua"
+./hpcluatool $* tests/stat-globalassign-table-matrix3x3x3.lua
+echo "stat-globalassign-table-ops.lua"
+./hpcluatool $* tests/stat-globalassign-table-ops.lua
+echo "stat-goto.lua"
+./hpcluatool $* tests/stat-goto.lua
+echo "stat-ifthenelseif-localassign.lua"
+./hpcluatool $* tests/stat-ifthenelseif-localassign.lua
+echo "stat-ifthenelse-localassign.lua"
+./hpcluatool $* tests/stat-ifthenelse-localassign.lua
+echo "stat-ifthenelse-mixedassign.lua"
+./hpcluatool $* tests/stat-ifthenelse-mixedassign.lua
+echo "stat-label-multiple.lua"
+./hpcluatool $* tests/stat-label-multiple.lua
+echo "stat-label-single.lua"
+./hpcluatool $* tests/stat-label-single.lua
+echo "stat-localassign-multiple-equal.lua"
+./hpcluatool $* tests/stat-localassign-multiple-equal.lua
+echo "stat-localassign-multiple-moreleft.lua"
+./hpcluatool $* tests/stat-localassign-multiple-moreleft.lua
+echo "stat-localassign-multiple-moreright.lua"
+./hpcluatool $* tests/stat-localassign-multiple-moreright.lua
+echo "stat-localassign-sequence-adjust.lua"
+./hpcluatool $* tests/stat-localassign-sequence-adjust.lua
+echo "stat-localassign-single-multiple.lua"
+./hpcluatool $* tests/stat-localassign-single-multiple.lua
+echo "stat-localassign-single-multiple-nonoverriding.lua"
+./hpcluatool $* tests/stat-localassign-single-multiple-nonoverriding.lua
+echo "stat-localassign-single-multiple-overriding.lua"
+./hpcluatool $* tests/stat-localassign-single-multiple-overriding.lua
+echo "stat-localassign-single-unitary.lua"
+./hpcluatool $* tests/stat-localassign-single-unitary.lua
+echo "stat-repeat-forever.lua"
+./hpcluatool $* tests/stat-repeat-forever.lua
+echo "stat-repeat-forever-assign.lua"
+./hpcluatool $* tests/stat-repeat-forever-assign.lua
+echo "stat-return-sequence-adjust.lua"
+./hpcluatool $* tests/stat-return-sequence-adjust.lua
+echo "stat-semicolon.lua"
+./hpcluatool $* tests/stat-semicolon.lua
+echo "stat-while-forever-assign.lua"
+./hpcluatool $* tests/stat-while-forever-assign.lua
+echo "stat-while-forever.lua"
+./hpcluatool $* tests/stat-while-forever.lua

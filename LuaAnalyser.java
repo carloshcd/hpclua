@@ -26,79 +26,150 @@
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
+import java.lang.StackTraceElement;
+
 public class LuaAnalyser implements Analyser { 
 
     private static SymbolTable symtab = new SymbolTable(); 
+    private static int verbosity = 0;
     private Language lang;
+    private String cmdLineName;
+    private String sourceCodeName;
+    private String generator;
 
-    public LuaAnalyser (int n, int f, int i) { 
-       this.lang = new LuaLanguage(n, f, i);
+    public LuaAnalyser (String h, String x, 
+                        int n, int f, int i, int s, int v, String c) { 
+       this.lang = new LuaLanguage(n, f, i, s);
+       this.cmdLineName = h;
+       this.sourceCodeName = x;
+       this.generator = c;
+       verbosity = v;
        symtab.setGlobals(lang.getBuiltIns());
     }
     
     public SymbolTable getSymbolTable() { return symtab; }
+    public static int getVerbosity() { return verbosity; }
     public Language getLanguage() { return lang; }
+    public String getCmdLineName() { return cmdLineName; }
+    public String getSourceCodeName() { return sourceCodeName; }
+    public String getGenerator() { return generator; }
 
-    public void setSymbolTable(SymbolTable st) { LuaAnalyser.symtab = st; }
-    public void setLanguage(Language l) { this.lang = l; }
-
+    @Override
     public void reportError(Integer l, Integer p, String m) {
-       System.err.printf("line %d:%d %s\n", l, p, m);
+       System.err.printf(cmdLineName+": line %d(%d): %s\n", l, p, m);
        System.exit(1);
     }
    
+    @Override
     public void reportError(Integer l, String m) {
-       System.err.printf("line %d %s\n", l, m);
+       System.err.printf(cmdLineName+": line %d: %s\n", l, m);
        System.exit(1);
     }
- 
+
+    @Override 
     public void reportError(String m) {
-       System.err.printf(m+"\n");
+       System.err.printf(cmdLineName+": "+m+"\n");
        System.exit(1);
     }
     
     public static String genVarName() { 
        int nextVar = symtab.genNewName();
-       return LuaLanguage.varPrefix + nextVar;
+       String name = LuaLanguage.varPrefix + nextVar;
+       return name;
     }
 
-    public String genRetVarName(String name) { 
-       return LuaLanguage.returnVarPrefix + name;
+    public String genOutVarName(String name) { 
+       return LuaLanguage.outVarPrefix + name;
+    }
+
+    public String genInVarName(String name) {
+       return LuaLanguage.inVarPrefix + name;
+    }
+
+    public String genForVarName() {
+       int nextVar = symtab.genNewName();
+       String name = LuaLanguage.forVarPrefix + nextVar;
+       return name;
     }
      
     public static boolean isGenVarName(String name) {
        return (name.startsWith(LuaLanguage.varPrefix));
     }
 
-    public static boolean isGenRetVarName(String name) {
-       return (name.startsWith(LuaLanguage.returnVarPrefix));
+    public static boolean isGenOutVarName(String name) {
+       return (name.startsWith(LuaLanguage.outVarPrefix));
     }
 
-    public static LuaType unbindVariables(LuaType t) {
+    public static boolean isGenInVarName(String name) {
+       return (name.startsWith(LuaLanguage.inVarPrefix));
+    }
+
+    public static LuaType mkNewGenVarType() {
+       int verb = verbosity;
+       if ( verb > 1 ) {
+          StackTraceElement[] stackTraceElements = 
+                                 Thread.currentThread().getStackTrace();
+          StackTraceElement ste = stackTraceElements[2];
+          System.out.printf("%s:Reaching %s\n", 
+                             ste.getClassName(), ste.getMethodName());
+       }
+       Scope scope = symtab.getGlobals();
+       VarType va = new VarType(genVarName());
+       String name = va.getVarName();
+       scope.defineName(new VariableSymbol(name,VarType._Unknown,0),verb);
+       return va;
+    }
+
+    public static LuaType mkNewUnbGenFunctType() {
+       int verb = verbosity;
+       if ( verb > 1 ) {
+          Object o = new Object(){};
+          System.out.printf("%s:Reaching %s\n", o.getClass().getName(),
+                             o.getClass().getEnclosingMethod().getName());
+       }
+       Scope scope = symtab.getGlobals();
+       VarType va = new VarType(genVarName());
+       String name = va.getVarName();
+       scope.defineName(new VariableSymbol(name,VarType._Unknown,0),verb);
+       VarType vb = new VarType(genVarName());
+       name = vb.getVarName();
+       scope.defineName(new VariableSymbol(name,VarType._Unknown,0),verb);
+       return new FunctionType(va, vb);
+    }
+
+    public static LuaType unbindVariables(LuaType t, int verb) {
        LuaType tp = t;
        while (tp instanceof QuantifiedType) {
+          if ( verb > 0 ) 
+             System.out.printf("Unbinding: [%s]\n", tp);
           VarType vo = ((QuantifiedType) tp).getTVar();
-          VarType vn = new VarType(genVarName());
-          String name = vn.getVarName();
+          VarType vn = (VarType) mkNewGenVarType();
           LuaType te = ((QuantifiedType) tp).getTExpr();
           tp = te.subst(vo,vn);
-          Scope scope = symtab.getGlobals();
-          scope.defineName(new VariableSymbol(name, VarType._Unknown, 0));
        }
+       System.gc();
        return tp;
     }    
-   
+ 
     public static LuaType opReturnType(String name) {
+       int verb = verbosity;
+       if ( verb > 0 ) 
+          System.out.printf("Operation: [%s]\n", name);
        Symbol symb = symtab.getGlobals().resolveName(name);
        LuaType type = LuaType.copy((LuaType)symb.getType()); 
-       type = unbindVariables(type); 
+       type = unbindVariables(type,verb); 
        if (type instanceof FunctionType) { 
           type = ((FunctionType) type).getRetTypes();
-          if (type instanceof SequenceType) {
-             if (((SequenceType) type).getElements().size() == 1)
-                type = ((SequenceType) type).getElements().get(0);
-          }
+          if ((type instanceof SequenceType) &&
+              (((SequenceType) type).getElements().size() == 1))
+             type = ((SequenceType) type).getElements().get(0);
        }
        return type;
+    }
+
+    public static void reportRule(String s) {
+       int verb = verbosity;
+       if ( verb > 1 )
+          System.out.printf("Applying: %s\n", s);
     }
 }

@@ -32,14 +32,15 @@
 ***/
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.tree.ParseTreeProperty;
 
-public class DefPhase extends HpcLuaBaseListener {
+public class DefPhase extends HpcLuaFullListener {
     LuaAnalyser analyser;    
-    Scope currentScope; 
+    int verb;
 
     public DefPhase(LuaAnalyser a) {
+        super();
         this.analyser = a;
+        this.verb = LuaAnalyser.getVerbosity();
     }
     
     public void error(Token t, String m) {
@@ -50,208 +51,559 @@ public class DefPhase extends HpcLuaBaseListener {
        analyser.getSymbolTable().getScopes().put(ctx,s); 
     }
 
+    public void reportReach(Object o,
+                            ParserRuleContext ctx) {
+       if ( this.verb > 1) 
+          System.out.printf("%s:Reaching %s line %d:%s\n", 
+                             o.getClass().getName(),
+                             o.getClass().getEnclosingMethod().getName(),
+                             ctx.start.getLine(), ctx.getText());
+    }
+
+    public void reportReach(Object o,
+                            ParserRuleContext ctx,
+                            Token t) {
+       if ( this.verb > 1) 
+          System.out.printf("%s:Reaching %s line %d(%d):%s\n", 
+                            o.getClass().getName(),
+                            o.getClass().getEnclosingMethod().getName(),
+                            ctx.start.getLine(), t.getCharPositionInLine(),
+                            ctx.getText());
+    }
+
+    public void reportLeave(Object o,
+                            ParserRuleContext ctx) {
+       if ( this.verb > 1) 
+          System.out.printf("%s:Leaving %s line %d:%s\n", 
+                             o.getClass().getName(),
+                             o.getClass().getEnclosingMethod().getName(),
+                             ctx.start.getLine(), ctx.getText());
+    }
+
+    public void reportLeave(Object o,
+                            ParserRuleContext ctx,
+                            Token t) {
+       if ( this.verb > 1) 
+          System.out.printf("%s:Leaving %s line %d(%d):%s\n", 
+                            o.getClass().getName(),
+                            o.getClass().getEnclosingMethod().getName(),
+                            ctx.start.getLine(), t.getCharPositionInLine(),
+                            ctx.getText());
+    }
+
+    public void enterVarType(HpcLuaParser.VarTypeContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    } 
+
+    public void exitVarType(HpcLuaParser.VarTypeContext ctx) {
+       reportReach(new Object(){}, ctx);
+       defineTVar(this.getCurrentScope(), ctx.NAME().getText(), 
+                  ctx.NAME().getSymbol().getLine());
+       reportLeave(new Object(){}, ctx);
+    }
+
     public void enterChunk(HpcLuaParser.ChunkContext ctx) {
-        currentScope = analyser.getSymbolTable().getGlobals();
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(analyser.getSymbolTable().getGlobals());
+       reportLeave(new Object(){}, ctx);
     }
 	
     public void exitChunk(HpcLuaParser.ChunkContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
 
     public void enterBlock(HpcLuaParser.BlockContext ctx) {
-        currentScope = new LocalScope(currentScope);
-        saveScope(ctx, currentScope);
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(new LocalScope(this.getCurrentScope()));
+       saveScope(ctx, this.getCurrentScope());
+       reportLeave(new Object(){}, ctx);
     }
 
     public void exitBlock(HpcLuaParser.BlockContext ctx) {
-        currentScope = currentScope.getEnclosingScope(); 
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope()); 
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void enterGAsgnStat(HpcLuaParser.GAsgnStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       this.setReverseTraversal(null);
+       reportLeave(new Object(){}, ctx);
     }
 
-    public void exitVarType(HpcLuaParser.VarTypeContext ctx) {
-        defineTVar(currentScope, ctx.NAME().getText(), 
-                   ctx.NAME().getSymbol().getLine());
+     public void exitGAsgnStat(HpcLuaParser.GAsgnStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       defineVars(analyser.getSymbolTable().getGlobals(),ctx.varList());
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void enterFunctionCallStat(HpcLuaParser.FunctionCallStatContext 
+                                                   ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+     public void exitFunctionCallStat(HpcLuaParser.FunctionCallStatContext 
+                                                   ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
     
-    public void exitGlobalVarAssignStat(HpcLuaParser.GlobalVarAssignStatContext 
-                                           ctx) {
-       defineVars(analyser.getSymbolTable().getGlobals(), ctx.varList());
+    public void enterLabelStat(HpcLuaParser.LabelStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
-    
+
     public void exitLabelStat(HpcLuaParser.LabelStatContext ctx) {
+       reportReach(new Object(){}, ctx);
        Scope scope = analyser.getSymbolTable().getGlobals();
        String name = ctx.label().NAME().getText();
        Symbol previous = scope.resolveName(name);
        if (previous == null) {
           int line = ctx.label().NAME().getSymbol().getLine();
-          scope.defineName(new Symbol(name, LuaType._Bottom, line));
+          scope.defineName(new Symbol(name, LuaType._Bottom, line),verb);
        }
-    }
-
-    public void enterForLocalNameStat(HpcLuaParser.ForLocalNameStatContext ctx) {
-       currentScope = new LocalScope(currentScope);
-       saveScope(ctx, currentScope);
-       defineVar(currentScope, ctx.varNameAndType());
+       reportLeave(new Object(){}, ctx);
     }
     
-    public void exitForLocalNameStat(HpcLuaParser.ForLocalNameStatContext ctx) {
-        currentScope = currentScope.getEnclosingScope(); 
-    }
-    
-    public void enterForLocalExprStat(HpcLuaParser.ForLocalExpStatContext ctx) {
-        currentScope = new LocalScope(currentScope);
-        saveScope(ctx, currentScope);
-        defineNames(currentScope, ctx.nameList());
+    public void enterBreakStat(HpcLuaParser.BreakStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
 
-    public void exitForLocalExprStat(HpcLuaParser.ForLocalExpStatContext ctx) {
-        currentScope = currentScope.getEnclosingScope(); 
+    public void exitBreakStat(HpcLuaParser.BreakStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterGotoStat(HpcLuaParser.GotoStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitGotoStat(HpcLuaParser.GotoStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void enterDoStat(HpcLuaParser.DoStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(new LocalScope(this.getCurrentScope()));
+       saveScope(ctx, this.getCurrentScope());
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitDoStat(HpcLuaParser.DoStatContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope());
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterWhileStat(HpcLuaParser.WhileStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitWhileStat(HpcLuaParser.WhileStatContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterRepeatStat(HpcLuaParser.RepeatStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitRepeatStat(HpcLuaParser.RepeatStatContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterIfStat(HpcLuaParser.IfStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitIfStat(HpcLuaParser.IfStatContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void enterForNumStat(HpcLuaParser.ForNumStatContext 
+                                             ctx) {
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(new LocalScope(this.getCurrentScope()));
+       saveScope(ctx, this.getCurrentScope());
+       defineVar(this.getCurrentScope(), ctx.varNameAndType());
+       this.setSecondFirstTraversal(this.getCurrentScope());
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope());
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void exitForNumStat(HpcLuaParser.ForNumStatContext 
+                                            ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterForGenStat(HpcLuaParser.ForGenStatContext 
+                                             ctx) {
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(new LocalScope(this.getCurrentScope()));
+       saveScope(ctx, this.getCurrentScope());
+       defineNames(this.getCurrentScope(), ctx.nameList());
+       this.setSecondFirstTraversal(this.getCurrentScope());
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope());
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitForGenStat(HpcLuaParser.ForGenStatContext 
+                                            ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
     
     public void enterFunctStat(HpcLuaParser.FunctStatContext ctx) {
-        String name = ctx.functName().varName(0).NAME().getText();
-        int line = ctx.functName().varName(0).NAME().getSymbol().getLine();
-        LuaType type = LuaAnalyser.unbindVariables(
-                          LuaType.copy(
-                             LuaTypeSystem._genericFunctionType));
-        FunctionSymbol function = new FunctionSymbol(name, type, line, 
-                                                     currentScope);
-        analyser.getSymbolTable().getGlobals().defineName(function); 
-        currentScope = function;  
-        saveScope(ctx, currentScope);  
+       reportReach(new Object(){}, ctx);
+       String name = ctx.functName().varName(0).NAME().getText();
+       int line = ctx.functName().varName(0).NAME().getSymbol().getLine();
+       LuaType functtype = LuaAnalyser.mkNewUnbGenFunctType(); 
+       FunctionSymbol function = new FunctionSymbol(name, functtype, line, 
+                                                    this.getCurrentScope());
+       analyser.getSymbolTable().getGlobals().defineName(function,verb); 
+       this.setCurrentScope(function);  
+       saveScope(ctx, this.getCurrentScope());  
 
-        type = ((FunctionType) type).getRetTypes();
-        currentScope.defineName(new VariableSymbol(analyser.genRetVarName(name), 
-                                                   type));
+       LuaType type = ((FunctionType) functtype).getRetTypes();
+       this.getCurrentScope().defineName(new 
+          VariableSymbol(analyser.genOutVarName(name), type), verb);
+       type = ((FunctionType) functtype).getParamTypes();
+       this.getCurrentScope().defineName(new
+          VariableSymbol(analyser.genInVarName(name), type), verb);
+       reportLeave(new Object(){}, ctx);
     }
 
     public void exitFunctStat(HpcLuaParser.FunctStatContext ctx) {
-        currentScope = currentScope.getEnclosingScope(); 
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope()); 
+       reportLeave(new Object(){}, ctx);
     }
 
     public void enterLocalFunctStat(HpcLuaParser.LocalFunctStatContext ctx) {
-        String name = ctx.varName().NAME().getText();
-        int line = ctx.varName().NAME().getSymbol().getLine();
-        LuaType type = LuaAnalyser.unbindVariables(
-                          LuaType.copy(
-                             LuaTypeSystem._genericFunctionType));
-        FunctionSymbol function = new FunctionSymbol(name, type, line, 
-                                                     currentScope);
-        currentScope.defineName(function); 
-        currentScope = function;
-        saveScope(ctx, currentScope);
+       reportReach(new Object(){}, ctx);
+       String name = ctx.varName().NAME().getText();
+       int line = ctx.varName().NAME().getSymbol().getLine();
+       LuaType functtype = LuaAnalyser.mkNewUnbGenFunctType(); 
+       FunctionSymbol function = new FunctionSymbol(name, functtype, line, 
+                                                    this.getCurrentScope());
+       this.getCurrentScope().defineName(function,verb); 
+       this.setCurrentScope(function);
+       saveScope(ctx, this.getCurrentScope());
 
-        type = ((FunctionType) type).getRetTypes();
-        currentScope.defineName(new VariableSymbol(analyser.genRetVarName(name),
-                                                   type));
+       LuaType type = ((FunctionType) functtype).getRetTypes();
+       this.getCurrentScope().defineName(new 
+          VariableSymbol(analyser.genOutVarName(name), type), verb);
+       type = ((FunctionType) functtype).getParamTypes();
+       this.getCurrentScope().defineName(new
+          VariableSymbol(analyser.genInVarName(name), type), verb);
+       reportLeave(new Object(){}, ctx);
     }
 
     public void exitLocalFunctStat(HpcLuaParser.LocalFunctStatContext ctx) {
-        currentScope = currentScope.getEnclosingScope();
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope());
+       reportLeave(new Object(){}, ctx);
     }
 
-    public void exitLocalVarAssignStat(HpcLuaParser.LocalVarAssignStatContext 
-                                          ctx) {
-       defineNames(currentScope, ctx.nameList());
+    public void enterLAsgnStat(HpcLuaParser.LAsgnStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       this.setReverseTraversal(this.getCurrentScope());
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope());
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void exitLAsgnStat(HpcLuaParser.LAsgnStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       defineNames(this.getCurrentScope(), ctx.nameList());
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterRetStat(HpcLuaParser.RetStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void exitRetStat(HpcLuaParser.RetStatContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterVar(HpcLuaParser.VarContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
 
-    public void exitParList(HpcLuaParser.ParListContext ctx) {
-       defineNames(currentScope, ctx.nameList());
-    } 
+    public void exitVar(HpcLuaParser.VarContext ctx) {
+       reportReach(new Object(){}, ctx);
+       if (ctx.type instanceof VarType) {
+          Scope scope = analyser.getSymbolTable().getGlobals();
+          String name = ((VarType) ctx.type).getVarName();
+          defineTVar(scope, name, 0);
+       } else  
+          new Throwable().printStackTrace();
+       reportLeave(new Object(){}, ctx);
+    }
+      
+   public void enterPowerOpExp(HpcLuaParser.PowerOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitPowerOpExp(HpcLuaParser.PowerOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterUnaryOpExp(HpcLuaParser.UnaryOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitUnaryOpExp(HpcLuaParser.UnaryOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterMulDivModOpExp(HpcLuaParser.MulDivModOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitMulDivModOpExp(HpcLuaParser.MulDivModOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
 
+    public void enterAddSubOpExp(HpcLuaParser.AddSubOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitAddSubOpExp(HpcLuaParser.AddSubOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void enterStrCatOpExp(HpcLuaParser.StrCatOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+
+    public void exitStrCatOpExp(HpcLuaParser.StrCatOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterCompOpExp(HpcLuaParser.CompOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitCompOpExp(HpcLuaParser.CompOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterAndOpExp(HpcLuaParser.AndOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitAndOpExp(HpcLuaParser.AndOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterOrOpExp(HpcLuaParser.OrOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitOrOpExp(HpcLuaParser.OrOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+   
+    public void enterBitOpExp(HpcLuaParser.BitOpExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitBitOpExp(HpcLuaParser.BitOpExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void enterTypeAscrExp(HpcLuaParser.TypeAscrExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitTypeAscrExp(HpcLuaParser.TypeAscrExpContext ctx) { 
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterPrefixExp(HpcLuaParser.PrefixExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void exitPrefixExp(HpcLuaParser.PrefixExpContext ctx) {
+       reportReach(new Object(){}, ctx);
+       if (ctx.type instanceof VarType) {
+          Scope scope = analyser.getSymbolTable().getGlobals();
+          String name = ((VarType) ctx.type).getVarName();
+          defineTVar(scope, name, 0);
+       } else  
+          new Throwable().printStackTrace();
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void enterFunctionCall(HpcLuaParser.FunctionCallContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
+    public void exitFunctionCall(HpcLuaParser.FunctionCallContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+    
     public void enterFunctDef(HpcLuaParser.FunctDefContext ctx) {
-        String name = LuaAnalyser.genVarName();
-        int line = ctx.start.getLine();
-        LuaType type = ctx.type;
-        FunctionSymbol function = new FunctionSymbol(name, type, line, 
-                                                     currentScope);
-        currentScope.defineName(function); 
-        currentScope = function;
-        saveScope(ctx, currentScope);
+       reportReach(new Object(){}, ctx);
+       String name = LuaAnalyser.genVarName();
+       int line = ctx.start.getLine();
+       LuaType functtype = ctx.type;
+       FunctionSymbol function = new FunctionSymbol(name, functtype, line, 
+                                                    this.getCurrentScope());
+       this.getCurrentScope().defineName(function,verb); 
+       this.setCurrentScope(function);
+       saveScope(ctx, this.getCurrentScope());
 
-        type = ((FunctionType) type).getRetTypes();
-        currentScope.defineName(new VariableSymbol(analyser.genRetVarName(name),
-                                                   type));
+       LuaType type = ((FunctionType) functtype).getRetTypes();
+       this.getCurrentScope().defineName(new 
+          VariableSymbol(analyser.genOutVarName(name), type), verb);
+       type = ((FunctionType) functtype).getParamTypes();
+       this.getCurrentScope().defineName(new
+          VariableSymbol(analyser.genInVarName(name), type), verb);
+       reportLeave(new Object(){}, ctx);
     }
 
     public void exitFunctDef(HpcLuaParser.FunctDefContext ctx) {
-        currentScope = currentScope.getEnclosingScope(); 
+       reportReach(new Object(){}, ctx);
+       this.setCurrentScope(this.getCurrentScope().getEnclosingScope()); 
+       reportLeave(new Object(){}, ctx);
     }
 
-    public void exitFunctCall(HpcLuaParser.FunctCallContext ctx) {
-       if (ctx.type instanceof VarType) {
-          Scope scope = analyser.getSymbolTable().getGlobals();
-          String name = ctx.type.getVarName();
-          defineTVar(scope, name, 0);
-       } else  
-          new Throwable().printStackTrace();
+    public void enterParList(HpcLuaParser.ParListContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    } 
+
+    public void exitParList(HpcLuaParser.ParListContext ctx) {
+       reportReach(new Object(){}, ctx);
+       defineNames(this.getCurrentScope(), ctx.nameList());
+       reportLeave(new Object(){}, ctx);
+    } 
+
+    public void enterVarName(HpcLuaParser.VarNameContext ctx) {
+       reportReach(new Object(){}, ctx, ctx.NAME().getSymbol());
+       reportLeave(new Object(){}, ctx, ctx.NAME().getSymbol());
     }
-       
-    public void exitVar(HpcLuaParser.VarContext ctx) {
-       if (ctx.type instanceof VarType) {
-          Scope scope = analyser.getSymbolTable().getGlobals();
-          String name = ctx.type.getVarName();
-          defineTVar(scope, name, 0);
-       } else  
-          new Throwable().printStackTrace();
-    }
-       
+ 
     public void exitVarName(HpcLuaParser.VarNameContext ctx) {
-       Symbol symb = currentScope.resolveName(ctx.NAME().getText());
+       reportReach(new Object(){}, ctx, ctx.NAME().getSymbol());
+       Symbol symb = this.getCurrentScope().resolveName(ctx.NAME().getText());
+       boolean pvtverr = false;
        if (symb != null && ctx.type instanceof VarType) {
           LuaType type = (LuaType) symb.getType();
-          if (type != null && type instanceof VarType && 
-              type.equals(VarType._Unknown))
-             error(ctx.NAME().getSymbol(),"The type variable "+
-                symb.getName() + " defined in line " + symb.getLine()+
+          if ((type != null) && (type instanceof VarType) && 
+              type.equals(VarType._Unknown)) {
+             pvtverr = true;
+             error(ctx.NAME().getSymbol(),"The type variable '"+
+                symb.getName() + "' defined on line " + symb.getLine()+
                 " was used as a program variable");
-
-          else { 
-             Scope scope = analyser.getSymbolTable().getGlobals();
-             String name = ctx.type.getVarName();
-             defineTVar(scope, name, 0);
-          }
+          } 
+       }
+       if (!pvtverr) { 
+          Scope scope = analyser.getSymbolTable().getGlobals();
+          String name = ((VarType) ctx.type).getVarName();
+          defineTVar(scope, name, 0);
        } 
+       reportLeave(new Object(){}, ctx, ctx.NAME().getSymbol());
+    }
+ 
+    public void enterVarNameAndType(HpcLuaParser.VarNameAndTypeContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
     }
     
-    public void defineVars(Scope focusScope, HpcLuaParser.VarListContext ctx) {
+    public void exitVarNameAndType(HpcLuaParser.VarNameAndTypeContext ctx) {
+       reportReach(new Object(){}, ctx);
+       reportLeave(new Object(){}, ctx);
+    }
+ 
+    public void defineVars(Scope focusScope, 
+                           HpcLuaParser.VarListContext ctx) {
+       reportReach(new Object(){}, ctx);
        HpcLuaParser.VarListContext varList = ctx;
        while (varList != null) {
           if (varList.var().varNameAndType() != null)
              defineVar(focusScope, varList.var().varNameAndType());
           varList = varList.varList();
        }
+       reportLeave(new Object(){}, ctx);
     }
     
-    public void defineNames(Scope focusScope, HpcLuaParser.NameListContext ctx) {
+    public void defineNames(Scope focusScope, 
+                            HpcLuaParser.NameListContext ctx) {
+       reportReach(new Object(){}, ctx);
        HpcLuaParser.NameListContext nameList = ctx;
        while (nameList != null) {
           defineVar(focusScope, nameList.varNameAndType());
           nameList = nameList.nameList();
        }
+       reportLeave(new Object(){}, ctx);
     }
     
-    public void defineVar(Scope focusScope, HpcLuaParser.VarNameAndTypeContext 
-                                               ctx) {
-        String name = ctx.varName().NAME().getText();
-        Symbol previous = focusScope.resolveName(name);
-        boolean override = 
+    public void defineVar(Scope focusScope, 
+                          HpcLuaParser.VarNameAndTypeContext ctx) {
+       reportReach(new Object(){}, ctx);
+       String name = ctx.varName().NAME().getText();
+       Symbol previous = focusScope.resolveName(name);
+       boolean override = 
            (ctx.parent instanceof HpcLuaParser.NameListContext) || 
-           (ctx.parent instanceof HpcLuaParser.ForLocalExpStatContext);
-        if (previous == null || override) {
-           int line = ctx.varName().NAME().getSymbol().getLine();
-           LuaType type = ctx.varName().type;
-           focusScope.defineName(new VariableSymbol(name, type, line));
-           if (type instanceof VarType) {
-              Scope scope = analyser.getSymbolTable().getGlobals();
-              defineTVar(scope, ((VarType) type).getVarName(), line);
-           } else  
+           (ctx.parent instanceof HpcLuaParser.ForNumStatContext);
+       if (previous == null || override) {
+          int line = ctx.varName().NAME().getSymbol().getLine();
+          LuaType type = ctx.varName().type;
+          focusScope.defineName(new VariableSymbol(name, type, line),verb);
+          if (type instanceof VarType) {
+             Scope scope = analyser.getSymbolTable().getGlobals();
+             defineTVar(scope, ((VarType) type).getVarName(), line);
+          } else  
              new Throwable().printStackTrace();
-        } 
+       } 
+       reportLeave(new Object(){}, ctx);
     }    
     
     public void defineTVar(Scope focusScope, String name, Integer line) {
-        Symbol previous = focusScope.resolveName(name);
-        if (previous == null) 
-           focusScope.defineName(new VariableSymbol(name, VarType._Unknown, 
-                                                    line));
+       Symbol previous = focusScope.resolveName(name);
+       if (previous == null) 
+          focusScope.defineName(new 
+             VariableSymbol(name, VarType._Unknown, line),verb);
     } 
 }

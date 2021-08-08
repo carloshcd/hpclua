@@ -31,7 +31,7 @@ import java.util.ArrayList;
 
 public class QuantifiedType extends LuaType {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 8L;
     
     VarType tvar;
     LuaType texpr;
@@ -49,16 +49,31 @@ public class QuantifiedType extends LuaType {
     public LuaType getTExpr() {
         return texpr;
     }
-   
+
+    public void setTVar(VarType t) {
+       this.tvar = t;
+    }
+
+    public void setTExpr(LuaType e) {
+       this.texpr = e;
+    }  
+ 
     @Override 
     public String toString() { 
-        return "V "+tvar.toString()+"."+texpr.toString();
+        return "V "+this.getTVar().fold()+"."+this.getTExpr().fold();
     }
     
     @Override 
-    public QuantifiedType expand(Scope s) { 
-       texpr = texpr.expand(s);
-       return this;
+    public LuaType expand(Scope s) { 
+       LuaType ntvar = this.getTVar().expand(s);
+       LuaType ntexpr = this.getTExpr().expand(s);
+       List<VarType> freeTVars = ntexpr.freeTVars();
+       if (freeTVars.contains(ntvar)) {
+          this.setTVar((VarType) ntvar);
+          this.setTExpr(ntexpr);
+          return this;
+       } else 
+          return ntexpr;
     }
     
     @Override
@@ -70,8 +85,8 @@ public class QuantifiedType extends LuaType {
         if (!getClass().equals(t.getClass()))
             return false;
         QuantifiedType other = (QuantifiedType) t;
-        return (this.texpr.equals(
-                   other.getTExpr().subst(other.getTVar(),this.tvar)));
+        return (this.getTExpr().equals(
+                   other.getTExpr().subst(other.getTVar(),this.getTVar())));
     }
 
     @Override
@@ -82,8 +97,12 @@ public class QuantifiedType extends LuaType {
           LuaType type = ((QuantifiedType) t).getTExpr();
           if (type != null) 
              return this.getTExpr().subtype(type);
-       } else if (t instanceof UnionType) // TUSup
-          return ((UnionType) t).TUSup(this);
+       } else
+          if (t instanceof SequenceType) // TSeq
+             return ((SequenceType) t).TSeq(this);
+          else 
+             if (t instanceof UnionType) // TUSup
+                return ((UnionType) t).TUSup(this);
        return false;
     }
     
@@ -97,37 +116,48 @@ public class QuantifiedType extends LuaType {
     
     @Override
     public LuaType subst(Scope s) { 
-       LuaType ret = LuaType.copy(this);
        VarType var = this.getTVar();
        Symbol symb = s.resolveName(var.getVarName());
-       if ((symb != null) && (symb.getName() != var.getVarName())) {
-          LuaType quant = this.getTExpr().subst(s);
-          ret = new QuantifiedType ((VarType) LuaType.copy(tvar), quant);
+       if ((symb != null) && (!symb.getName().equals(var.getVarName()))) {
+          this.setTExpr(this.getTExpr().subst(s));
+          this.setTVar(((VarType) LuaType.copy(this.getTVar())));
        } 
-       return ret;
+       return this;
     }
     
     @Override 
     public List<VarType> freeTVars() {
        List<VarType> freeElemVars = new ArrayList<VarType>();
-       List<VarType> e = this.texpr.freeTVars();
+       List<VarType> e = this.getTExpr().freeTVars();
        for(VarType v : e) {
-          if (!this.tvar.equals(v))
+          if (!this.getTVar().equals(v))
              freeElemVars.add(v);
        }
        return freeElemVars;
     }
     
     @Override
-    public Scope unifiesWith (Scope s, LuaType t) {
-       if (t.equals(LuaType._Any) || 
-           t instanceof VarType ||
-           t instanceof UnionType)
-          return t.unifiesWith(s, this);
+    public Scope unifiesWith (Scope s, LuaType t, int verb) {
+       if ( verb > 1 )
+          System.out.printf("Unifying QuantifiedType: %s/%s\n", this, t);
+       if (t.equals(LuaType._Any))
+          return s;
+       else if (t instanceof VarType ||
+                t instanceof UnionType)
+          return t.unifiesWith(s,this,verb);
        else 
           if (freeTVars(s).contains(this.getTVar()))
              return null;
-          else 
-             return this.getTExpr().unifiesWith(s,t);
+          else { // Abs
+             Scope s1 = this.getTExpr().unifiesWith(s,t,verb);
+             if (s1 != null && verb > 1) 
+                System.out.printf("Applying: Abs\n");
+             return s1;
+          }
+    }
+
+    @Override
+    public String fold() {
+       return this.toString();
     }
 }

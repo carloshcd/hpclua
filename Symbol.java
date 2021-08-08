@@ -31,67 +31,89 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
 import java.io.Serializable;
+import java.lang.Boolean;
 
-public class Symbol implements Serializable { 
+public class Symbol { 
 
-    private static final long serialVersionUID = 1L;
+    public static final String genPrefix = "_";
 
     String name;  
     Type type;    
     int line;    
     Scope scope;  
+    boolean isScheduler;
+    FunctionSymbol scheduler;
 
     public Symbol() { 
        this.name = "";
        this.type = null;
        this.line = 0;
+       this.isScheduler = false;
+       this.scheduler = null;
     }
 
     public Symbol(String n) { 
        this.name = n; 
        this.type = null; 
        this.line = 0;
+       this.isScheduler = false;
+       this.scheduler = null;
     }
 
     public Symbol(Type t) {
        this.name = "";
        this.type = t;
        this.line = 0;
+       this.isScheduler = false;
+       this.scheduler = null;
     }
 
     public Symbol(String n, Type t) { 
        this.name = n; 
        this.type = t; 
        this.line = 0;
+       this.isScheduler = false;
+       this.scheduler = null;
     }
 
     public Symbol(String n, Type t, int l) {
        this.name = n;  
        this.type = t; 
        this.line = l;
+       this.isScheduler = false;
+       this.scheduler = null;
     }
     
     public String getName() { return name; }
     public Type getType() { return type; }
     public int getLine() { return line; }
     public Scope getScope() { return scope; }
+    public boolean isScheduler() { return isScheduler; }
+    public FunctionSymbol getScheduler() { return scheduler; }
+    public Boolean getDealsJustWithNumKeyTables() { return false; }
 
     public void setName(String n) { this.name = n; }
     public void setType(Type t) { this.type = t; }
+    public void setLine(int l) { this.line = l; }
     public void setScope(Scope s) { this.scope = s; }
+    public void setAsScheduler(boolean s) { this.isScheduler = s; }
+    public void setScheduled(FunctionSymbol f) { this.scheduler = f; }
 
     public static String stripBrackets(String s) {
         return s.substring(1,s.length()-1);
     }
-    
+   
+    @Override 
     public String toString() {
-        String s = line + ":";
-        if ( scope != null ) 
-           s = scope.getScopeName()+".";
-        s = s+getName();
-        if ( type!=null ) 
-           return ""+s+":."+type+"";
-        else
+        String s = this.getLine() + ":";
+        s = s+this.getName();
+        if ( this.getType() == null ) 
            return s;
+        else
+           return s+":."+this.getType();
+    }
+
+    public static boolean isGen(String name) {
+       return (name.startsWith(genPrefix));
     }
 }

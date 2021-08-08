@@ -31,8 +31,10 @@
 ***/
 public class LocalScope extends BaseScope {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 6L;
     
     public LocalScope(Scope parent) { super(parent); }
+
+    @Override
     public String getScopeName() { return "locals"; }
 }

@@ -26,46 +26,41 @@
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
-import java.lang.String;
 import java.util.List;
 import java.util.ArrayList;
 
 public class VarType extends LuaType {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 14L;
     public static final String _unknownName = "";
     
     String varName;   
  
     public VarType() {
-        super(LuaType.tVAR);
-        this.varName = _unknownName;
-        this.setName(varName);
+       super(LuaType.tVAR);
+       this.varName = _unknownName;
     }
  
     public VarType(String n) {
-        super(LuaType.tVAR);
-        this.varName = n;
-        this.setName(varName);
+       super(LuaType.tVAR);
+       this.varName = n;
     }
     
     public String getVarName() {
-        return varName;
+       return varName;
     }
    
     @Override 
     public String toString() { 
-        return varName;
+       return this.varName;
     }
     
     @Override
     public LuaType expand(Scope s) {
        LuaType result = _Unknown;
-       if (!name.equals(_unknownName)) {
+       if (!this.getVarName().equals(_unknownName)) {
           Symbol var = s.resolveName(this.getVarName());
-          if (var == null)
-             result = LuaType._Bottom;
-          else 
+          if (var != null)
              result = (LuaType) var.getType();
        }
        if (result.equals(_Unknown))
@@ -83,7 +78,7 @@ public class VarType extends LuaType {
         if (!getClass().equals(t.getClass()))
             return false;
         VarType other = (VarType) t;
-        return (this.varName.equals(other.getVarName()));
+        return (this.getVarName().equals(other.getVarName()));
     }
 
     @Override
@@ -93,10 +88,19 @@ public class VarType extends LuaType {
        LuaType type = (LuaType) this.getType();
        if (type != null) // TVar
           return type.subtype(t);
-       else if (this.equals(t)) // TVRefl
-          return true;
-       else if (t instanceof UnionType) // TUSup 
-          return ((UnionType) t).TUSup(this);
+       else 
+          if (t instanceof VarType) {
+             LuaType typet = (LuaType) ((VarType) t).getType();
+             if (type == null && typet == null) // TVRefl 
+                return true;
+             else
+                return false;
+          } else 
+             if (t instanceof SequenceType) // TSeq
+                return ((SequenceType) t).TSeq(this);
+             else 
+                if (t instanceof UnionType) // TUSup 
+                   return ((UnionType) t).TUSup(this);
        return false;
     }
     
@@ -115,14 +119,14 @@ public class VarType extends LuaType {
        if (symb != null) { 
           LuaType type = (LuaType) symb.getType();
           if (type.equals(_Unknown))
-             return LuaType.copy(this);
+             return this;
           else  
              if (type instanceof VarType)
                 return type.subst(s);
              else
                 return LuaType.copy(type);
        } else 
-          return LuaType.copy(this);
+          return this;
     }
     
     @Override 
@@ -133,40 +137,50 @@ public class VarType extends LuaType {
     }
    
     @Override
-    public Scope unifiesWith (Scope s, LuaType t) {
-       if (t.equals(LuaType._Any))
+    public Scope unifiesWith (Scope s, LuaType t, int verb) {
+       if ( verb > 1 ) 
+          System.out.printf("Unifying VarType: %s/%s\n", this, t);
+       if (t.equals(LuaType._Any)) { 
           return s;
-       boolean reverse = false;
-       String name = this.getVarName();
-       Symbol symb = s.resolveName(name);
-       LuaType type = _Unknown;
-       if (symb != null) {
-          type = (LuaType) symb.getType();
-          if (t instanceof VarType) {
-             int line = symb.getLine();
-             String nameA = ((VarType) t).getVarName();
-             Symbol symbA = s.resolveName(nameA);
-             if (symbA != null) {
-                LuaType typeA = (LuaType) symb.getType();
-                int lineA = symbA.getLine();
-                if (VariableSymbol.isGen(name)) {
-                   if (!VariableSymbol.isGen(nameA) ||
-                       (lineA > line && !typeA.equals(_Unknown)) ||
-                       (lineA == line && name.compareTo(nameA)<0 && 
-                                         !typeA.equals(_Unknown)))
-                       reverse = true;
-                }
-             } else
-                new Throwable().printStackTrace();
-          } 
+       } else { 
+          boolean reverse = false;
+          String name = this.getVarName();
+          LuaType type = _Unknown;
+          if (name != null) {
+             Symbol symb = s.resolveName(name);
+             if (symb != null) {
+                type = (LuaType) symb.getType();
+                if (t instanceof VarType) {
+                   int line = symb.getLine();
+                   String nameA = ((VarType) t).getVarName();
+                   Symbol symbA = s.resolveName(nameA);
+                   if (symbA != null) {
+                      LuaType typeA = (LuaType) symbA.getType();
+                      if (Symbol.isGen(name)) {
+                         int lineA = symbA.getLine();
+                         if (!Symbol.isGen(nameA) ||
+                             (lineA > line && !typeA.equals(_Unknown)) ||
+                             (lineA == line && name.compareTo(nameA)<0 && 
+                                                !typeA.equals(_Unknown)))
+                             reverse = true;
+                      }
+                   } else
+                      return null; // new Throwable().printStackTrace();
+                } 
+             } 
+          }
+          if (reverse) 
+             return t.unifiesWith(s,this,verb); 
+          else 
+             if (!type.equals(_Unknown))
+                return type.unifiesWith(s,t.subst(s),verb);
+             else { // Spec
+                Scope s1 = LuaType.extend(s, this, t.subst(s), verb);
+                if (s1 != null && verb > 1) 
+                   System.out.printf("Applying: Spec\n");
+                return s1;
+             }
        }
-       if (reverse) 
-          return t.unifiesWith(s, this); 
-       else 
-          if (!type.equals(_Unknown))
-             return type.unifiesWith(s, t.subst(s));
-          else
-             return LuaType.extend(s, this, t.subst(s));
     }
 
     public boolean toBeResolved(Scope s) {
@@ -177,6 +191,11 @@ public class VarType extends LuaType {
           result = type.equals(_Unknown);
        }
        return result;
+    }
+
+    @Override
+    public String fold() {
+       return this.toString();
     }
 
     public static final VarType _Unknown = new VarType();

@@ -37,22 +37,37 @@ public class SymbolTable {
     ParseTreeProperty<Scope> scopes;
     int lastGeneratedName;
 
-    public static final int firstGenName = 1;
+    public static final int firstGenName = 2;
     
     public SymbolTable() {
-        this.globals = new GlobalScope(null);
-        this.scopes = new ParseTreeProperty<Scope>();
-        this.lastGeneratedName = firstGenName;
+       this.globals = new GlobalScope();
+       this.scopes = new ParseTreeProperty<Scope>();
+       this.lastGeneratedName = firstGenName;
     }
         
-    public GlobalScope getGlobals() { return globals; }
-    public ParseTreeProperty<Scope> getScopes() { return scopes; }
+    public GlobalScope getGlobals() { 
+       return globals; 
+    }
+
+    public ParseTreeProperty<Scope> getScopes() { 
+       return scopes; 
+    }
     
-    public void setGlobals(GlobalScope globs) { this.globals = globs; }
-    public void setScopes(ParseTreeProperty<Scope> scops) { this.scopes = scops; }
+    public void setGlobals(GlobalScope globs) { 
+       this.globals = globs; 
+    }
+
+    public void setScopes(ParseTreeProperty<Scope> scops) { 
+       this.scopes = scops; 
+    }
     
-    public int getLastGen() { return lastGeneratedName; }
-    public int genNewName() { return ++lastGeneratedName; }
+    public int getLastGen() { 
+       return lastGeneratedName; 
+    }
+
+    public int genNewName() { 
+       return ++lastGeneratedName; 
+    }
     
     public String genName(String radix) { 
        int nextVar = genNewName();
@@ -60,11 +75,13 @@ public class SymbolTable {
     }
     
     public boolean isGenName(String radix, String name) {
-       if (name.equals("")) 
+       if ("".equals(name)) 
           return false;
        else
           return (name.startsWith(radix));
     }
     
-    public String toString() { return globals.toString(); }
+    public String toString() { 
+       return globals.toString(); 
+    }
 }

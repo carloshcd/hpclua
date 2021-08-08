@@ -1,0 +1,2 @@
+-- block-empty.lua, v1.0, 2019-07-13 11:52:55.725937529 -0300, chcd
+-- Please see copyright notice in file dotests

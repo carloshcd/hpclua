@@ -29,8 +29,6 @@
 public interface Analyser { 
     public SymbolTable getSymbolTable();
     public Language getLanguage();
-    public void setSymbolTable(SymbolTable st); 
-    public void setLanguage(Language l); 
     public void reportError(Integer l, Integer p, String m);
     public void reportError(Integer l, String m);
     public void reportError(String m);

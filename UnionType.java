@@ -31,14 +31,13 @@ import java.util.ArrayList;
 
 public class UnionType extends LuaType {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 12L;
     
     SequenceType elements;   
     
     public UnionType() {
        super(LuaType.tUNION);
        this.elements = new SequenceType();
-       this.setName(this.toString());
     }
 
     public UnionType(LuaType t) {
@@ -48,7 +47,7 @@ public class UnionType extends LuaType {
        else {
           List<LuaType> temp = new ArrayList<LuaType>();
           temp.add(t);
-          this.elements = new SequenceType(temp);
+          this.elements = new SequenceType (temp);
        }
     }
      
@@ -56,18 +55,25 @@ public class UnionType extends LuaType {
         return elements;
     }
 
+    public void setElements(SequenceType s) {
+       this.elements = s;
+    }
+
     public int size() {
-        return elements.size();
+        return this.getElements().size();
     }
    
     @Override 
     public String toString() {
-       return "U "+elements.toString();
+       if (this.size() == 0)
+          return "Bottom";
+       else
+          return "U "+this.getElements().fold();
     }
  
     @Override 
     public UnionType expand(Scope s) { 
-       elements = elements.expand(s);
+       this.setElements(this.getElements().expand(s));
        return this;
     }
 
@@ -88,48 +94,50 @@ public class UnionType extends LuaType {
            else
               return (this.subtype(other) && other.subtype(this));
     }
-    
+   
     @Override
     public boolean subtype(LuaType t) {
        if (t.equals(LuaType._Any)) // TTop
           return true;
-       else if (this.equals(LuaType._Bottom)) // TBot
+       if (this.equals(LuaType._Bottom)) // TBot
           return true;
-       
-       // TUSub
-       SequenceType te = this.elements;
-       if (te != null) {
-          int nel = te.size();
-          if (nel == 0)
-             return true;
-          else {
-             for (int i=0;i<nel;i++) {
-                if (!(te.getElements().get(i).subtype(t)))
-                   return false;
+       if (t instanceof UnionType) { 
+          SequenceType te = this.getElements();
+          if (te != null) { // TSub
+             int nel = te.size();
+             if (nel == 0)
+                return true;
+             else {
+                for (int i=0;i<nel;i++) {
+                   if (!(te.getElements().get(i).subtype(t))) // TUSub
+                      return false;
+                }
+                return true;
              }
-             return true;
-          }
-       } else 
-          return false;
+          } 
+       } else
+          if (t instanceof SequenceType) 
+             return ((SequenceType) t).TSeq(this);
+       return false;
     }
    
     public boolean TUSup(LuaType t) { // TUSup
        SequenceType te = this.getElements();
        if (te != null) {
-          for (int i=0;i<te.size();i++) {
+          int nel = te.size();
+          for (int i=0;i<nel;i++) {
              if (t.subtype(te.getElements().get(i)))
                 return true;
           }
-          return false;
-       } else
-          return false;
+       } 
+       return false;
     }
  
     @Override
     public LuaType subst(LuaType v, LuaType t) { 
        LuaType obj = this.getElements();
        if (obj.equals(v))
-          this.elements = (SequenceType) LuaType.copy(t);
+          this.setElements((SequenceType) LuaType.copy(t));
        else
           obj.subst(v,t);
        return this;
@@ -137,38 +145,45 @@ public class UnionType extends LuaType {
     
     @Override
     public LuaType subst(Scope s) { 
-       return new UnionType(this.getElements().subst(s));
+       this.setElements((SequenceType) this.elements.subst(s));
+       return this;
     }
     
     @Override 
     public List<VarType> freeTVars() {
-       return this.elements.freeTVars();
+       return this.getElements().freeTVars();
     }
     
     @Override
-    public Scope unifiesWith (Scope s, LuaType t) { 
-       if (t.equals(LuaType._Any) || t instanceof VarType)
-          return t.unifiesWith(s, this);
-       else
-          if (t instanceof UnionType) {
+    public Scope unifiesWith (Scope s, LuaType t, int verb) { 
+       if ( verb > 1 ) 
+          System.out.printf("Unifying UnionType: %s/%s\n", this, t);
+       if (t.equals(LuaType._Any))
+          return s;
+       else if (t instanceof VarType)
+          return t.unifiesWith(s,this,verb);
+       else {
+          List<LuaType> elems = this.getElements().getElements();
+          Scope s1 = null;
+          if (t instanceof UnionType) { // Union
              if (this.equals(LuaType._Bottom) &&
                  t.equals(LuaType._Bottom))
                 return s;
              List<Scope> results = new ArrayList<Scope>();
-             Scope s1;
              int base = 0;
-             for(LuaType t1 : this.getElements().getElements()) {
+             for(LuaType t1 : elems) {
                 s1 = null;
                 boolean tbrt1 = (t1 instanceof VarType && 
                                  ((VarType) t1).toBeResolved(s));
                 boolean tbrt2 = false;
                 SequenceType seq = ((UnionType) t).getElements();
                 int i;
-                for(i=base;i<seq.size();i++) {
+                int nel = seq.size();
+                for(i=base;i<nel;i++) {
                    LuaType t2 = seq.getElements().get(i);
                    tbrt2 = (t2 instanceof VarType &&
                             ((VarType) t2).toBeResolved(s));
-                   Scope s2 = t1.unifiesWith(s, t2);
+                   Scope s2 = t1.unifiesWith(s,t2,verb);
                    if (s2 != null) {
                       if (s1 == null)
                          s1 = s;
@@ -189,42 +204,88 @@ public class UnionType extends LuaType {
                    s1 = r;
                 else
                    s1.mergeWith(r);
-             return s1;
           } else {
-             Scope s1 = null;
-             for(LuaType t1 : this.getElements().getElements()) {
-                Scope s2 = t1.unifiesWith(s, t);
+             for(LuaType t1 : elems) {
+                Scope s2 = t1.unifiesWith(s,t,verb);
                 if (s2 != null) {
                    if (s1 == null)
                       s1 = s;
-                   s1.mergeWith(s2);
+                   s1.mergeWith(s2); 
+                   break;
                 }
              }
-             return s1;
           }
+          if (s1 != null && verb > 1) 
+             System.out.printf("Applying: Union\n");
+          return s1;
+       }
     }
     
     public void mergeWith(UnionType t) {
        List<LuaType> newElems = t.getElements().getElements();
-       List<LuaType> oldElems = this.getElements().getElements();
-       if (newElems != null)
+       if (newElems != null) {
+          List<LuaType> oldElems = this.getElements().getElements();
           oldElems.addAll(newElems);
+       }
     }
 
-    private String fold() {
+    @Override
+    public String fold() {
        if (this.equals(_Bottom))
           return "Bottom";
        else if (this.equals(_Integer))
           return "Integer";
        else if (this.equals(_Float))
           return "Float";
-       else if (this.equals(_Table))
-          return "Table";
-       else if (this.equals(_Function))
-          return "Function";
        else if (this.equals(_Object))
           return "Object";
        else
           return this.toString();
+    }
+    
+    @Override
+    public boolean isNumericType() {
+       SequenceType contents = this.getElements();
+       if (contents != null) {
+          List<LuaType> elements = contents.getElements();
+          if (elements.size() > 0) { 
+             for(LuaType elem : elements) { 
+                if (elem.isNumericType()) 
+                   return true;
+             }
+          } else
+             return true;
+       } 
+       return false; 
+    }
+    
+    @Override
+    public LuaType mostGeneralNumericType() {
+       LuaType mostGeneral = LuaType._Bottom;
+       SequenceType contents = this.getElements();
+       if (contents != null) {
+          List<LuaType> elements = contents.getElements();
+          if (elements.size() > 0) { 
+             for(LuaType elem : elements) { 
+                LuaType newType = elem;
+                if (newType instanceof UnionType) 
+                   newType = newType.mostGeneralNumericType();
+                if (newType == null)
+                   return null;
+                else 
+                   if (newType.isBasicNumericType()) {
+                      if (mostGeneral.subtype(newType)) 
+                         mostGeneral = newType;
+                      else 
+                         if (!newType.subtype(mostGeneral))
+                            mostGeneral = LuaType._Number;
+                   }
+             }
+          }
+       } 
+       if (mostGeneral.isBasicNumericType())
+          return mostGeneral;
+       else
+          return null;
     }
 }

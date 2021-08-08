@@ -33,22 +33,32 @@ import java.util.ArrayList;
 
 public class LuaTypeSystem implements TypeSystem { 
 
+    private static final long serialVersionUID = 15L;
+
     private Map<Integer,Type> types;
     private static int ndefault;
     private static int fdefault;
     private static int idefault;
+    private static int strictness;
 
-    public LuaTypeSystem(int n, int f, int i) { 
+    public LuaTypeSystem(int n, int f, int i, int s) { 
        this.types = new HashMap<Integer,Type>(); 
         for (Map.Entry<Integer,LuaType> me : LuaType._BuiltInTypes.entrySet())
            this.defineType(me.getKey(), me.getValue());
         ndefault = n;
         fdefault = f;
         idefault = i;
+        strictness = s;
     }
 
-    public void defineType(Integer i, Type t) { types.put(i,t); }
-    public Map<Integer,Type> getTypes() { return types; }
+    public void defineType(Integer i, Type t) { 
+       types.put(i,t); 
+    }
+
+    public Map<Integer,Type> getTypes() { 
+       return types; 
+    }
+
     public int getTypeIndex(Type t) { 
        for (int i=0;i<types.size();i++) 
           if (t.equals(types.get(i))) 
@@ -68,14 +78,20 @@ public class LuaTypeSystem implements TypeSystem {
        return ndefault;
     }
 
+    public static int getStrictness() {
+       return strictness;
+    }
+
+    protected static final String tVar0 = LuaLanguage.varPrefix + 
+                                       (SymbolTable.firstGenName - 2);
     protected static final String tVar1 = LuaLanguage.varPrefix + 
                                        (SymbolTable.firstGenName - 1);
     protected static final String tVar2 = LuaLanguage.varPrefix + 
-                                       SymbolTable.firstGenName;
+                                       (SymbolTable.firstGenName);
+                                       
+    protected static final VarType v0 = new VarType(tVar0);
     protected static final VarType v1 = new VarType(tVar1);
     protected static final VarType v2 = new VarType(tVar2);
-    public static final QuantifiedType _genericFunctionType = 
-       new QuantifiedType(v1, new QuantifiedType(v2, new FunctionType(v1, v2)));
     
     public static final BuiltInSymbol _false = 
        new BuiltInSymbol("false",LuaType._Boolean);
@@ -85,34 +101,44 @@ public class LuaTypeSystem implements TypeSystem {
        new BuiltInSymbol("nil",LuaType._Nil);
     public static final BuiltInSymbol _empty = 
        new BuiltInSymbol("{}",LuaType._Table);
+    public static final BuiltInSymbol _arg = 
+       new BuiltInSymbol("arg", new TableType(LuaType._Int,LuaType._Any));
         
     protected static final List<LuaType> _paramTwoVarTypes = 
         new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
-        add(v1); add(v2); }};
+           private static final long serialVersionUID = 1501L; {
+              add(v0); add(v1); }};
     protected static final LuaType _retBoolType = 
        LuaType._Boolean;
     protected static final QuantifiedType _compOpType = 
        (QuantifiedType) (new FunctionType (new SequenceType(_paramTwoVarTypes), 
                                               _retBoolType)).bindFree();
-    
+    protected static final List<LuaType> _paramTwoEqVarTypes =
+       new ArrayList<LuaType>() {
+          private static final long serialVersionUID = 1502L; {
+             add(v0); add(v0); }};
+    protected static final QuantifiedType _compEqOpType =
+       (QuantifiedType) (new FunctionType (
+                            new SequenceType(_paramTwoEqVarTypes),
+                                             _retBoolType)).bindFree();
+ 
     public static final BuiltInSymbol _eq = 
        new BuiltInSymbol("==",_compOpType);
     public static final BuiltInSymbol _ieq = 
        new BuiltInSymbol("~=",_compOpType);
     public static final BuiltInSymbol _le = 
-       new BuiltInSymbol("<=",_compOpType); 
+       new BuiltInSymbol("<=",_compEqOpType); 
     public static final BuiltInSymbol _ge = 
-       new BuiltInSymbol(">=",_compOpType); 
+       new BuiltInSymbol(">=",_compEqOpType); 
     public static final BuiltInSymbol _lt = 
-       new BuiltInSymbol("<",_compOpType);  
+       new BuiltInSymbol("<",_compEqOpType);  
     public static final BuiltInSymbol _gt = 
-       new BuiltInSymbol(">",_compOpType); 
+       new BuiltInSymbol(">",_compEqOpType); 
       
     protected static final List<LuaType> _paramOneVarType = 
         new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
-        add(LuaType._Any); }};
+           private static final long serialVersionUID = 1503L; {
+              add(LuaType._Any); }};
     protected static final FunctionType _unBoolOpType = 
        new FunctionType (new SequenceType(_paramOneVarType), 
                                           _retBoolType);       
@@ -131,28 +157,32 @@ public class LuaTypeSystem implements TypeSystem {
     public static final BuiltInSymbol _or = 
        new BuiltInSymbol("or",_binBoolOpType);
 
-    protected static final List<LuaType> _paramOneStrTypes = 
+    protected static final List<LuaType> _paramOneStruTypes = 
         new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
-        add(LuaType._String); }};
+           private static final long serialVersionUID = 1504L; {
+              add(LuaType._Table);
+              add(LuaType._String); }};
     protected static final LuaType _retIntType = LuaType._Int;
-    public static final FunctionType _unStrOpType = 
-       new FunctionType(new SequenceType(_paramOneStrTypes), _retIntType);
+    public static final FunctionType _unStruOpType = 
+       new FunctionType(new UnionType(new SequenceType(_paramOneStruTypes)), 
+                        _retIntType);
 
     public static final BuiltInSymbol _len = 
-       new BuiltInSymbol("#",_unStrOpType);
+       new BuiltInSymbol("#",_unStruOpType);
 
     protected static final List<LuaType> _StrNumTypes = 
         new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
-        add(LuaType._String); add(LuaType._Number); }};
+           private static final long serialVersionUID = 1505L; {
+              add(LuaType._String); 
+              add(LuaType._Number); }};
     protected static final UnionType _paramUnStrNumTypes  = 
         new UnionType(new SequenceType(_StrNumTypes));
 
     protected static final List<LuaType> _paramTwoStrTypes = 
         new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
-        add(_paramUnStrNumTypes); add(_paramUnStrNumTypes); }};
+           private static final long serialVersionUID = 1506L; {
+              add(_paramUnStrNumTypes); 
+              add(_paramUnStrNumTypes); }};
     protected static final LuaType _retStrType = LuaType._String;
     public static final FunctionType _binStrOpType = 
        new FunctionType(new SequenceType(_paramTwoStrTypes), _retStrType);
@@ -175,8 +205,9 @@ public class LuaTypeSystem implements TypeSystem {
 
     protected static final List<LuaType> _BinStrNumTypes =
         new ArrayList<LuaType>() {
-        private static final long serialVersionUID = 1L; {
-        add(_paramUnStrNumTypes); add(_paramUnStrNumTypes); }};
+           private static final long serialVersionUID = 1507L; {
+              add(_paramUnStrNumTypes); 
+              add(_paramUnStrNumTypes); }};
     protected static final SequenceType _paramBinStrNumTypes = 
        new SequenceType(_BinStrNumTypes);
     public static final FunctionType _binNumOpType = 
@@ -221,15 +252,107 @@ public class LuaTypeSystem implements TypeSystem {
        new BuiltInSymbol("<<", _binBitOpType); 
     public static final BuiltInSymbol _shr = 
        new BuiltInSymbol(">>", _binBitOpType);
-    
+
+    public static final BuiltInSymbol _type =
+       new BuiltInSymbol("type", 
+          new FunctionType(LuaType._Any, LuaType._String));
+    public static final BuiltInSymbol _print = 
+       new BuiltInSymbol("print",
+          new FunctionType(LuaType._Any, LuaType._Nil));
+    public static final BuiltInSymbol _tonumber = 
+       new BuiltInSymbol("tonumber",
+          new FunctionType(LuaType._Any,
+             new UnionType(new SequenceType(
+                new ArrayList<LuaType>() {
+                private static final long serialVersionUID = 1508L; {
+                   add(LuaType._Nil); 
+                   add(LuaType._Number); }}))));
+    public static final BuiltInSymbol _tostring =
+       new BuiltInSymbol("tostring", 
+          new FunctionType(LuaType._Any, LuaType._String));
+    public static final BuiltInSymbol _ipairs = 
+       new BuiltInSymbol("ipairs", 
+          (QuantifiedType)
+          (new FunctionType(
+             new TableType(LuaType._Int, v0),
+             new SequenceType(
+                new ArrayList<LuaType>() {
+                private static final long serialVersionUID = 1509L; {
+                   add(new FunctionType(
+                          new SequenceType(
+                             new ArrayList<LuaType>() {
+                                private static final long 
+                                   serialVersionUID = 1510L; {
+                                      add(new TableType(LuaType._Int, v0));
+                                      add(LuaType._Int); 
+                                }}), 
+                          new SequenceType (
+                             new ArrayList<LuaType>() {
+                                private static final long 
+                                   serialVersionUID = 1511L; {
+                                      add(LuaType._Int); 
+                                      add(v0); 
+                                }}))); 
+                   add(new TableType(LuaType._Int, v0));
+                   add(LuaType._Int); 
+                }}))).bindFree()); 
+   public static final BuiltInSymbol _pairs =
+       new BuiltInSymbol("pairs",
+          (QuantifiedType)
+          (new FunctionType(
+             new TableType(v0, v1),
+             new SequenceType(
+                new ArrayList<LuaType>() {
+                private static final long serialVersionUID = 1512L; {
+                   add(new FunctionType(
+                          new SequenceType(
+                             new ArrayList<LuaType>() {
+                                private static final long 
+                                   serialVersionUID = 1513L; {
+                                      add(new TableType(v0, v1));
+                                      add(v0); 
+                                }}), 
+                          new SequenceType (
+                             new ArrayList<LuaType>() {
+                                private static final long 
+                                   serialVersionUID = 1514L; {
+                                      add(v0); 
+                                      add(v1); 
+                                }})));
+                   add(new TableType(v0, v1));
+                   add(LuaType._Nil); 
+                }}))).bindFree());
+   public static final BuiltInSymbol _next =
+       new BuiltInSymbol("next",
+          (QuantifiedType)
+          (new FunctionType(
+             new SequenceType(
+                new ArrayList<LuaType>() {
+                   private static final long serialVersionUID = 1515L; {
+                      add(new TableType(v0, v1));
+                      add(new UnionType(new SequenceType(
+                         new ArrayList<LuaType>() {
+                           private static final long serialVersionUID = 1516L;{
+                              add(v0); 
+                              add(LuaType._Nil);
+                           }})));
+                   }}), 
+             new SequenceType (
+                new ArrayList<LuaType>() {
+                   private static final long serialVersionUID = 1517L; {
+                      add(v0); 
+                      add(v1); 
+                   }}))).bindFree());
     public static final List<Symbol> _BuiltInSymbols = 
         new ArrayList<Symbol>() {
-        private static final long serialVersionUID = 1L; {
+        private static final long serialVersionUID = 1599L; {
 
+        add(_nil);
         add(_false); 
         add(_true); 
-        add(_nil); 
         add(_empty); 
+
+        add(_arg);
 
         add(_eq);
         add(_ieq);
@@ -264,5 +387,31 @@ public class LuaTypeSystem implements TypeSystem {
         add(_bor); 
         add(_shl); 
         add(_shr);
+
+        add(_type);
+        add(_print);
+        add(_tonumber);
+        add(_tostring);
+        add(_ipairs);
+        add(_pairs);
+        add(_next);
     }};
+
+    public static final LuaType _mapType =
+          (new FunctionType(
+             new SequenceType(
+                new ArrayList<LuaType>() {
+                   private static final long serialVersionUID = 1516L; {
+                   add(new FunctionType(v0, 
+                      new UnionType(new SequenceType( 
+                         new ArrayList<LuaType>() {
+                            private static final long 
+                               serialVersionUID = 1517L; {
+                                  add(v1);
+                                  add(LuaType._Nil);
+                         }}))
+                   ));
+                   add(new TableType(v2, v0));
+                }}),
+             LuaType._Table)).bindFree();
 }

@@ -27,11 +27,10 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
 import java.util.List;
-import java.util.ArrayList;
 
 public class FunctionType extends LuaType {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 4L;
 
     SequenceType paramTypes;
     SequenceType retTypes;   
@@ -45,8 +44,7 @@ public class FunctionType extends LuaType {
         if (r instanceof SequenceType) 
            this.retTypes = (SequenceType) r;
         else 
-           this.retTypes = new SequenceType(r);        
-        this.setName(this.toString());
+           this.retTypes = new SequenceType (r);        
     }
     
     public SequenceType getParamTypes() {
@@ -57,31 +55,38 @@ public class FunctionType extends LuaType {
        return retTypes;
     }
    
+    public void setParamTypes(SequenceType p) {
+       this.paramTypes = p;
+    }
+
+    public void setRetTypes(SequenceType r) {
+       this.retTypes = r;
+    }
+
     @Override 
     public String toString() { 
-       String result = "";
-       if (paramTypes.getElements().size() == 1) 
-          result = paramTypes.getElements().get(0).toString();
+       String result = "(";
+       if (this.getParamTypes().getElements().size() == 1) 
+          result = result + this.getParamTypes().getElements().get(0).fold();
        else
-          result = paramTypes.toString();
+          result = result + this.getParamTypes().fold();
        result = result + " -> ";
-       if (retTypes.getElements().size() == 1)
-          result = result + retTypes.getElements().get(0).toString();
+       if (this.getRetTypes().getElements().size() == 1)
+          result = result + this.getRetTypes().getElements().get(0).fold();
        else
-          result = result + retTypes.toString();
-       return result; 
+          result = result + this.getRetTypes().fold();
+       return result + ")"; 
     }
     
     @Override 
     public FunctionType expand(Scope s) { 
-       paramTypes = paramTypes.expand(s);
-       retTypes = retTypes.expand(s);
+       this.setParamTypes(this.getParamTypes().expand(s));
+       this.setRetTypes(this.getRetTypes().expand(s));
        return this;
     }
     
     @Override
     public boolean equals(Object t) {
-
         if (t == this)
             return true;
         if (t == null) 
@@ -89,8 +94,8 @@ public class FunctionType extends LuaType {
         if (!getClass().equals(t.getClass()))
             return false;
         FunctionType other = (FunctionType) t;
-        return (this.paramTypes.equals(other.getParamTypes())) &&
-               (this.retTypes.equals(other.getRetTypes()));
+        return (this.getParamTypes().equals(other.getParamTypes())) &&
+               (this.getRetTypes().equals(other.getRetTypes()));
     }
 
     @Override
@@ -98,11 +103,16 @@ public class FunctionType extends LuaType {
        if (t.equals(LuaType._Any)) // TTop
           return true; 
        if (t instanceof FunctionType) { // TFunc
+          // System.out.printf("Compare %s with %s\n", this, t);
           FunctionType tp = (FunctionType) t;
-          return (tp.getParamTypes().subtype((this.getParamTypes())) &&
-                  this.getRetTypes().subtype(tp.getRetTypes()));
-       } else if (t instanceof UnionType) // TUSup
-          return ((UnionType) t).TUSup(this);
+          return (tp.getParamTypes().subtype((this.getParamTypes()))) && 
+                 (this.getRetTypes().subtype(tp.getRetTypes()));
+       } else 
+          if (t instanceof SequenceType) // TSeq
+             return ((SequenceType) t).TSeq(this);
+          else
+             if (t instanceof UnionType) // TUSup
+                return ((UnionType) t).TUSup(this);
        return false;
     }
     
@@ -110,29 +120,28 @@ public class FunctionType extends LuaType {
     public LuaType subst(LuaType v, LuaType t) { 
        LuaType obj = this.getParamTypes();
        if (obj.equals(v))
-          this.paramTypes = (SequenceType) LuaType.copy(t);
+          this.setParamTypes((SequenceType) LuaType.copy(t));
        else
           obj.subst(v,t);
        obj = this.getRetTypes();
        if (obj.equals(v))
-          this.retTypes = (SequenceType) LuaType.copy(t);
+          this.setRetTypes((SequenceType) LuaType.copy(t));
        else
           obj.subst(v,t);
        return this;
     }
     
-    
     @Override
     public LuaType subst(Scope s) { 
-       SequenceType params = (SequenceType) this.getParamTypes().subst(s);
-       SequenceType rets = (SequenceType) this.getRetTypes().subst(s);
-       return new FunctionType(params, rets);
+       this.setParamTypes((SequenceType) this.getParamTypes().subst(s));
+       this.setRetTypes((SequenceType) this.getRetTypes().subst(s));
+       return this;
     }
     
     @Override 
     public List<VarType> freeTVars() {
-       List<VarType> freeParamVars = this.paramTypes.freeTVars(); 
-       List<VarType> freeRetVars = this.retTypes.freeTVars();
+       List<VarType> freeParamVars = this.getParamTypes().freeTVars(); 
+       List<VarType> freeRetVars = this.getRetTypes().freeTVars();
        for(VarType v : freeRetVars) { 
           if (!freeParamVars.contains(v))
              freeParamVars.add(v);
@@ -141,21 +150,29 @@ public class FunctionType extends LuaType {
     }
     
     @Override
-    public Scope unifiesWith (Scope s, LuaType t) {
-       if (t.equals(LuaType._Any) || 
-           t instanceof VarType || 
-           t instanceof UnionType)
-          return t.unifiesWith(s, this);
+    public Scope unifiesWith (Scope s, LuaType t, int verb) {
+       if ( verb > 1 ) 
+          System.out.printf("Unifying FunctionType: %s/%s\n", this, t);
+       if (t.equals(LuaType._Any))
+          return s;  
+       else if (t instanceof VarType || 
+                t instanceof UnionType)
+          return t.unifiesWith(s,this,verb);
        else 
-          if (t instanceof FunctionType) {
+          if (t instanceof FunctionType) { // FAbs 
              List<LuaType> l1 = this.getParamTypes().getElements();
-             List<LuaType> l2 = ((FunctionType) t).getParamTypes().getElements();
-             Scope s1 = LuaType.unifiesLists(s, l1, l2, false);
-             l1 = this.getRetTypes().getElements();
-             l2 = ((FunctionType) t).getRetTypes().getElements();
-             Scope s2 = LuaType.unifiesLists(s1, l1, l2, false);
-             // s1.mergeWith(s2);
-             return s2;
+             List<LuaType> l2 = ((FunctionType) t).getParamTypes().
+                                   getElements();
+             Scope s1 = LuaType.unifiesLists(s,l1,l2,verb);
+             if (s1 != null) {
+                l1 = this.getRetTypes().getElements();
+                l2 = ((FunctionType) t).getRetTypes().getElements();
+                Scope s2 = LuaType.unifiesLists(s1,l1,l2,verb);
+                if (s2 != null && verb > 1) 
+                   System.out.printf("Applying: FAbs\n");
+                return s2;
+             } else
+                return null;
           } else
              return null;
     }
@@ -163,9 +180,22 @@ public class FunctionType extends LuaType {
     public LuaType bindFree() {
        List<VarType> freeTVars = this.freeTVars();
        LuaType result = this;
-       for(VarType v : freeTVars) { // should reverse freeTVars before binding?
+       for(VarType v : freeTVars) 
           result = new QuantifiedType(v, result);
-       }
        return result;
+    }
+
+    @Override
+    public String fold() {
+       if (this.equals(LuaType._Function))
+          return "Function";
+       else
+          return this.toString();
+    }
+
+    @Override
+    public boolean isNumericType() {
+       return this.getParamTypes().isNumericType() && 
+              this.getRetTypes().isNumericType();
     }
 }

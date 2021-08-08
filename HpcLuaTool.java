@@ -27,52 +27,52 @@
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ***/
-import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.DiagnosticErrorListener;
-import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.atn.LexerATNSimulator;
 import org.antlr.v4.runtime.atn.PredictionMode;
 
-import java.nio.file.Files;
 import java.io.File;
 import java.io.IOException;
-import java.lang.System;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
 class HpcLuaTool {
+   public static String cmdLineName = "hpcluatool";
 
    public static boolean profile = false;
    public static boolean printTree = false;
-   public static boolean SLL = false;
+   public static boolean sll = false;
    public static boolean diag = false;
    public static boolean bail = false;
    public static boolean x2 = false;
    public static boolean threaded = false;
 
-   public static boolean verbose = false;
+   public static int verbosity = 0;
    public static boolean stype = false;
    public static boolean pprint = false;
    public static boolean help = false;
 
    public static boolean typei = false;
+   public static String codeGen = "";
    public static int fdefault = 0;
    public static int idefault = 0;
    public static int ndefault = 0;
+   public static int strictness = 0;
    
    public static Worker[] workers = new Worker[3];
    static int windex = 0;
 
    public static CyclicBarrier barrier;
 
-   public static volatile boolean firstPassDone = false;
+   public static boolean firstPassDone = false;
 
    public static class Worker implements Runnable {
       public long parserStart;
@@ -113,14 +113,15 @@ class HpcLuaTool {
             for(int i=0; i< args.length; i++) {
                if ( args[i].equals("-prof") ) profile = true;
                else if ( args[i].equals("-ptree") ) printTree = true;
-               else if ( args[i].equals("-SLL") ) SLL = true;
+               else if ( args[i].equals("-pprint") ) pprint = true;
+               else if ( args[i].equals("-SLL") ) sll = true;
                else if ( args[i].equals("-diag") ) diag = true;
                else if ( args[i].equals("-bail") ) bail = true;
                else if ( args[i].equals("-2x") ) x2 = true;
                else if ( args[i].equals("-threaded") ) threaded = true;
-               else if ( args[i].equals("-verb") ) verbose = true;
+               else if ( args[i].equals("-verb") ) verbosity = 1;
+               else if ( args[i].equals("-vverb") ) verbosity = 2;
                else if ( args[i].equals("-stype") ) stype = true;
-               else if ( args[i].equals("-pprint") ) pprint = true;
                else if ( args[i].equals("-help") ) help = true;
                else if ( args[i].equals("-typei") ) typei = true;
                else if ( args[i].equals("-dFloat") ) ndefault = 1;
@@ -129,8 +130,16 @@ class HpcLuaTool {
                else if ( args[i].equals("-dSingle") ) fdefault = 2;
                else if ( args[i].equals("-dLong") ) idefault = 1;
                else if ( args[i].equals("-dInt") ) idefault = 2;
-               else if ( args[i].charAt(0) == '-' ) 
-                        warning = "Invalid command line option!";
+               else if ( args[i].equals("-tstrict") ) strictness = 1;
+               else if ( args[i].equals("-tsstrict") ) strictness = 2;
+               else if ( args[i].startsWith("-codeGen=") ) { 
+                  int equal = args[i].indexOf('=');
+                  if (equal != 0) 
+                     codeGen = args[i].substring(equal + 1);
+                  if ("".equals(codeGen))
+                     warning = "Invalid command line option";                  
+               } else if ( args[i].charAt(0) == '-' ) 
+                  warning = "Invalid command line option";
                if ( args[i].charAt(0) !='-' ) { 
                   inputFiles.add(args[i]);
                }
@@ -138,58 +147,95 @@ class HpcLuaTool {
             if ( warning != null )
                help = true;
             if ( !help ) {
-               List<String> sourceFiles = new ArrayList<String>();
-               for (String fileName : inputFiles) {
-                  List<String> files = getFilenames(new File(fileName));
-                     sourceFiles.addAll(files);
-                }
-                doFiles(sourceFiles);
+               if (pprint && printTree)
+                  warning = "The options -ptree and -pprint " +
+                             "cannot be used together";
+               else if (!"".equals(codeGen) && (pprint || printTree)) 
+                  warning = "The option -codeGen cannot be used " +
+                            "together with -ptree or -pprint";
+               else if (strictness > 0 && !typei)
+                  warning = "The strictness options cannot be used without " +
+                            "setting option -typei";
+               else if (!"".equals(codeGen) && !typei) 
+                  warning = "The option -codeGen cannot be used without " +
+                            "setting option -typei";
+               
+               else {
+                  if (!"".equals(codeGen)) 
+                     stype = true;
+                  List<String> sourceFiles = new ArrayList<String>();
+                  for (String fileName : inputFiles) {
+                     List<String> files = getFilenames(new File(fileName));
+                        sourceFiles.addAll(files);
+                   }
+                   doFiles(sourceFiles);
 
-                if ( x2 ) {
-                   System.gc();
-                   if ( verbose ) System.out.println("waiting for 1st pass");
-                   if ( threaded ) while ( !firstPassDone ) { } 
-                   if ( verbose ) System.out.println("2nd pass");
-                      doFiles(sourceFiles);
-                }
+                   if ( x2 ) {
+                      System.gc();
+                      if ( verbosity != 0 ) 
+                         System.out.println("waiting for 1st pass");
+                      if ( threaded ) 
+                         while ( !firstPassDone ) { /** nothing **/ } 
+                      if ( verbosity != 0 ) System.out.println("2nd pass");
+                         doFiles(sourceFiles);
+                   }
+               }
+               if ( warning != null ) {
+                  System.err.println(cmdLineName+": "+warning);
+                  printCmdLineMsg();
+               }
             } else {
                if ( warning != null ) 
-                  System.err.println(warning);
-               System.out.println("Usage: java HpcLuaTool [OPTION] <directory or file name(s)>");
-               System.out.println("Parses and treats a hpclua directory or file(s).\n");
-               System.out.println("Command line options:");
-               System.out.println("-prof: presents profiling info");
-               System.out.println("-ptree: prints the parse tree");
-               System.out.println("-SLL: use SLL prediction");
-               System.out.println("-diag: identifies additional grammar problems");
-               System.out.println("-bail: imediatelly cancels parsing on errors");
-               System.out.println("-2x: performs a second compile pass");
-               System.out.println("-threaded: threaded runtime execution");
-               System.out.println("-verb: works more verbosely");;
-               System.out.println("-stype: strips types from code");
-               System.out.println("-typei: infer program types");
-               System.out.println("-dFloat: Float is the default numerical type");
-               System.out.println("-dInteger: Integer is the default numerical type");
-               System.out.println("-dDouble: Double is the default floating-point type");
-               System.out.println("-dSingle: Single is the default floating-point type");
-               System.out.println("-dLong: Long is the default integer type");
-               System.out.println("-dInt: Int is the default integer type");
-               System.out.println("-pprint: pretty prints the parse tree");
-               System.out.println("-help: this message");
+                  System.err.println(cmdLineName+": "+warning);
+               printUsage();
             }
-         } else {
-            System.err.println("Usage: java HpcLuaTool [OPTIONS] <directory or file name(s)>");
-            System.err.println("Try 'java HpcLuaTool -help' for more information.\n");
-         }
+         } else
+            printCmdLineMsg();
         long stop = System.currentTimeMillis();
-        if ( profile ) System.out.println("Total elapsed time " + (stop - start) + "ms.");
+        if ( profile ) 
+           System.out.println("Total elapsed time " + (stop - start) + "ms.");
         System.gc();
       } catch(Exception e) {
-         System.err.println("exception: "+e);
+         System.err.println("command line treatment exception: "+e);
          e.printStackTrace(System.err);   
       }
    }
 
+   public static void printUsage() {
+     System.out.println("USAGE: "+cmdLineName+
+                        " [OPTION] <directory or file name(s)>");
+     System.out.println("Parses and treats a directory or some file(s).");
+     System.out.println("OPTIONS:");
+     System.out.println("-prof: presents profiling info");
+     System.out.println("-ptree: prints the parse tree");
+     System.out.println("-pprint: pretty prints the parse tree");
+     System.out.println("-SLL: uses SLL prediction");
+     System.out.println("-diag: identifies additional grammar problems");
+     System.out.println("-bail: imediatelly cancels parsing on errors");
+     System.out.println("-2x: performs a second compile pass");
+     System.out.println("-threaded: threaded runtime execution");
+     System.out.println("-verb: works more verbosely");
+     System.out.println("-vverb: works very verbosely");
+     System.out.println("-stype: strips types from code");
+     System.out.println("-typei: infers program types");
+     System.out.println("-codeGen=X: uses X as a compiler to generate parallelized code");
+     System.out.println("-dFloat: Float is the default numerical type");
+     System.out.println("-dInteger: Integer is the default numerical type");
+     System.out.println("-dDouble: Double is the default floating-point type");
+     System.out.println("-dSingle: Single is the default floating-point type");
+     System.out.println("-dLong: Long is the default integer type");
+     System.out.println("-dInt: Int is the default integer type");
+     System.out.println("-tstrict: adopts the strict typing policy");
+     System.out.println("-tsstrict: adopts the super-strict typing policy");
+     System.out.println("-help: this message");
+   }
+   
+   public static void printCmdLineMsg() {
+      System.out.println("USAGE: "+cmdLineName+
+                         " [OPTIONS] <directory or file name(s)>");
+      System.out.println("Try '"+cmdLineName+" -help' for more information.\n");
+   }
+   
    public static void doFiles(List<String> files) throws Exception {
       long parserStart = System.currentTimeMillis();
       if ( threaded ) {
@@ -198,9 +244,9 @@ class HpcLuaTool {
                report(); firstPassDone = true;
             }
          });
-         int chunkSize = files.size() / 3;  // 10/3 = 3
-         int p1 = chunkSize; // 0..3
-         int p2 = 2 * chunkSize; // 4..6, then 7..10
+         int chunkSize = files.size() / 3;  
+         int p1 = chunkSize; 
+         int p2 = 2 * chunkSize; 
          workers[0] = new Worker(files.subList(0,p1+1));
          workers[1] = new Worker(files.subList(p1+1,p2+1));
          workers[2] = new Worker(files.subList(p2+1,files.size()));
@@ -213,7 +259,9 @@ class HpcLuaTool {
             parseFile(f);
          }
          long parserStop = System.currentTimeMillis();
-         if ( profile ) System.out.println("Total lexer+parser time " + (parserStop - parserStart) + "ms.");
+         if ( profile ) 
+            System.out.println("Total lexer+parser time " + 
+               (parserStop - parserStart) + "ms.");
       }
    }
 
@@ -223,13 +271,14 @@ class HpcLuaTool {
          for (Worker w : workers) {
             long wtime = w.parserStop - w.parserStart;
             time = Math.max(time,wtime);
-            if ( profile ) System.out.println("worker time " + wtime + "ms.");
+            if ( profile ) 
+               System.out.println("worker time " + wtime + "ms.");
          }
       }
-      if ( verbose ) {
-         if ( profile ) System.out.println("Total lexer+parser time " + time + "ms.");
+      if ( verbosity != 0 ) {
+         if ( profile ) 
+            System.out.println("Total lexer+parser time " + time + "ms.");
          System.out.println("finished parsing OK");
-         System.out.println(LexerATNSimulator.match_calls+" lexer match calls");
       }
    }
 
@@ -239,7 +288,8 @@ class HpcLuaTool {
       return files;
    }
 
-   public static void getFilenames_(File f, List<String> files) throws Exception {
+   public static void getFilenames_(File f, 
+                                    List<String> files) throws Exception {
       if (f.isDirectory()) {
          String flist[] = f.list();
          for(int i=0; i < flist.length; i++) {
@@ -256,46 +306,62 @@ class HpcLuaTool {
       if (!file.exists()) 
          System.err.println("File not found: " + f);
       else {
-         if ( verbose ) System.out.println("File: " + f);
+         if ( verbosity != 0 ) { 
+            System.out.println("File: "+f); }
          try {
             CharStream codePointCharStream = CharStreams.fromFileName(f);
             HpcLuaLexer lexer =  new HpcLuaLexer(codePointCharStream);
             CommonTokenStream tokens = new CommonTokenStream(lexer);
 
-            LuaAnalyser analyser = new LuaAnalyser(ndefault,fdefault,idefault);
+            LuaAnalyser analyser = new LuaAnalyser(cmdLineName, f,
+                                                   ndefault,fdefault,
+                                                   idefault,strictness,
+                                                   verbosity,codeGen);
             HpcLuaParser parser = new HpcLuaParser(tokens);
-            if ( diag ) parser.addErrorListener(new DiagnosticErrorListener());
-            if ( bail ) parser.setErrorHandler(new BailErrorStrategy());
-            if ( SLL ) parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
+            parser.removeErrorListeners();
+            parser.addErrorListener(new HpcLuaToolErrorListener(cmdLineName));
+            if ( diag ) 
+               parser.addErrorListener(new DiagnosticErrorListener());
+            if ( bail ) 
+               parser.setErrorHandler(new BailErrorStrategy());
+            if ( sll ) 
+               parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
 
             parser.setBuildParseTree(true);
             ParseTree tree = parser.chunk();
    
-            ParseTreeWalker walker = new ParseTreeWalker();
-            if (typei) {
+            HpcLuaParseTreeWalker walker = new HpcLuaParseTreeWalker();
+            if ( typei ) {
                DefPhase def = new DefPhase(analyser);
                walker.walk(def, tree);
                RefPhase ref = new RefPhase(analyser);
                walker.walk(ref, tree);
             }
       
-            TreePrinterListener listener = 
-               new TreePrinterListener(parser,
-                  analyser.getSymbolTable());
-            listener.setStrip(stype);
-            listener.setTypeInfer(typei);
-            if ( pprint )
-               listener.setCode();
-            else 
-               listener.setTree();
-
-            if ( typei )
-               walker.walk(listener, tree);
-            else 
-               ParseTreeWalker.DEFAULT.walk(listener, tree);
-
-            if ( pprint || printTree ) 
+            if ( pprint || printTree ) {
+               LuaTreePrinterListener listener = 
+                  new LuaTreePrinterListener(parser,
+                     analyser.getSymbolTable());
+               listener.setStrip(stype);
+               listener.setTypeInfer(typei);
+               if ( pprint )
+                  listener.setCode();
+               else 
+                  listener.setTree();
+               if ( typei )
+                  walker.walk(listener, tree);
+               else 
+                  HpcLuaParseTreeWalker.DEFAULT.walk(listener, tree);
                System.out.print(listener.toString());
+            } else 
+               if ( !"".equals(codeGen) ) {
+                  LuaCodeGeneratorListener listener = 
+                     new LuaCodeGeneratorListener(parser, analyser);
+                  listener.setGenerator(codeGen);
+                  walker.walk(listener, tree);
+                  listener.compileGeneratedCpp();
+                  System.out.print(listener.toString());
+               }
          } catch (IOException i) {
             System.err.println("file handling exception: "+i);
             i.printStackTrace();

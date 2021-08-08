@@ -1,0 +1,52 @@
+# 
+#  dotests-nonstrict (copyright applies to all test files in the distribution)
+#
+#  [The "BSD license"]
+#  Copyright (c) 2019 Carlos Henrique Cabral Duarte
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in the
+#     documentation and/or other materials provided with the distribution.
+#  3. The name of the author may not be used to endorse or promote products
+#     derived from this software without specific prior written permission.
+#  THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+#  IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+#  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+#  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+#  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+#  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+echo "stat-forgen-nonstrict.lua"
+./hpcluatool $* tests/stat-forgen-nonstrict.lua
+echo "stat-functstat-fromTo-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-fromTo-nonstrict.lua
+echo "stat-functstat-loop-noinput-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-loop-noinput-nonstrict.lua
+echo "stat-functstat-return-many-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-return-many-nonstrict.lua
+echo "stat-functstat-return-many-var-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-return-many-var-nonstrict.lua
+echo "stat-functstat-return-isBool-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-return-isBool-nonstrict.lua
+echo "stat-functstat-return-okBool-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-return-okBool-nonstrict.lua
+echo "stat-functstat-return-variable-nonstrict.lua"
+./hpcluatool $* tests/stat-functstat-return-variable-nonstrict.lua
+echo "stat-globalassign-generalize-ascr-nonstrict.lua"
+./hpcluatool $* tests/stat-globalassign-generalize-ascr-nonstrict.lua
+echo "stat-globalassign-single-multiple-nonstrict.lua"
+./hpcluatool $* tests/stat-globalassign-single-multiple-nonstrict.lua
+echo "stat-ifthenelse-globalassign-nonstrict.lua"
+./hpcluatool $* tests/stat-ifthenelse-globalassign-nonstrict.lua
+echo "stat-ifthenelseif-globalassign-nonstrict.lua"
+./hpcluatool $* tests/stat-ifthenelseif-globalassign-nonstrict.lua
