@@ -27,7 +27,7 @@ HpcLua is released under the BSD Licence below.
   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
   NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER, CAUSED AND ON ANY
   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -55,7 +55,7 @@ Please check access paths and environment variables required to run these tools.
 
 ## Building ##
 
-Once you have installed the software above in your systen, just run:
+Once you have installed the software above in your system, just run:
 
 $ ./make
 
@@ -67,13 +67,13 @@ Just type:
 
 $ ./hpcluatool -help
 
-We have included in this distributions the following two lua program:
+We have included in this distribution the following two Lua programs:
 
    original.lua
    heavy.lua
 
-Thay are made available so that you can experimennt with HpcLua in you system.
+They are available so you can experiment with HpcLua on your system.
 
-In order to execute the generated software using some parallelizing standalone, 
+In order to execute the generated software using a parallelising standalone, 
 copy the generated code to the "run" folder and use some executable therein.
 
