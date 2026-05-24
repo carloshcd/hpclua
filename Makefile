@@ -26,11 +26,11 @@
 #  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-JAVAC = javac -O
+JAVAC = javac
 ANTLR = java -jar /usr/local/lib/antlr-4.8-complete.jar
 
 # Java compilation args
-JFLAGS = -Xlint
+JFLAGS = 
 
 default : all
 
